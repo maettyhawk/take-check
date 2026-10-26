@@ -16,6 +16,21 @@ Vor-/Hinterherziehen gegenüber dem Klick ist Stil und kein Fehler).
 - Web-Oberfläche mit Pianoroll, Wellenform, Befundliste, Sprung zur Stelle, Tooltips, Deutsch/Englisch, Darkmode
 - Auswertungsprofile in `profiles/*.toml` (Regeln und Schwellen, erweiterbar)
 
+## KI-Check
+
+Optional lässt sich die Analyse von Claude (Anthropic-API) einordnen: Zuerst-anhören-Liste mit Begründung,
+vermutliche Erkennungsartefakte, Muster über den Take und ein Rückmeldetext für den Musiker. Gesendet werden
+nur Analysewerte (Befunde, Takte, Hinweise) – kein Audio und keine Vorlagendatei.
+
+Der API-Schlüssel wird aus `ANTHROPIC_API_KEY` gelesen oder aus einer Datei, standardmäßig
+`~/.config/take-check/anthropic_api_key` (anderer Ort per `TAKE_CHECK_API_KEY_FILE`). Den Schlüssel nie ins
+Repository legen.
+
+```bash
+TAKE_CHECK_API_KEY_FILE=~/.secrets/anthropic_api_key uv run take-check serve
+uv run take-check ai-check ergebnis.json            # für ein gespeichertes Ergebnis aus 'analyze -o'
+```
+
 ## Installation
 
 Voraussetzungen: Python 3.12, [uv](https://docs.astral.sh/uv/), `ffmpeg` und `libsndfile`.

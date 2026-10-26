@@ -23,6 +23,11 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--profile", default=None, help="Auswertungsprofil aus profiles/ (Standard: standard)")
     a.add_argument("--min-confidence", type=float, default=0.5, help="nur Meldungen ab dieser Konfidenz zeigen")
 
+    k = sub.add_parser("ai-check", help="KI-Einschätzung zu einem gespeicherten Ergebnis (JSON aus 'analyze -o')")
+    k.add_argument("result", help="Ergebnisdatei aus 'take-check analyze -o'")
+    k.add_argument("--lang", choices=["de", "en"], help="Sprache der Antwort (Standard: aus $LANG)")
+    k.add_argument("-o", "--output", help="KI-Check als JSON speichern")
+
     s = sub.add_parser("serve", help="Web-Oberfläche starten")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -32,6 +37,9 @@ def main(argv: list[str] | None = None) -> int:
         import uvicorn
         uvicorn.run("take_check.api:app", host=args.host, port=args.port)
         return 0
+
+    if args.cmd == "ai-check":
+        return _ai_check(args)
 
     from .analyze import analyze
     from .i18n import cli_lang, pick
@@ -66,6 +74,43 @@ def main(argv: list[str] | None = None) -> int:
             occ = f" (pass {i['occurrence']})" if i["occurrence"] > 1 else ""
             where = f"Bar {i['bar']}{occ} beat {i['beat']:<5}"
         print(f"  {where} {i['time']:7.2f}s  [{i['confidence']:.2f}]  {pick(i.get('messages', i['message']), lang)}")
+    return 0
+
+
+def _ai_check(args) -> int:
+    from .ai_check import AiCheckError, credentials_available, run_ai_check
+    from .i18n import cli_lang
+
+    lang = args.lang or cli_lang()
+    if not credentials_available():
+        print("Kein Anthropic-API-Schlüssel gefunden (ANTHROPIC_API_KEY setzen)." if lang == "de"
+              else "No Anthropic API key found (set ANTHROPIC_API_KEY).", file=sys.stderr)
+        return 2
+    with open(args.result) as fh:
+        result = json.load(fh)
+    try:
+        ai = run_ai_check(result, lang)
+    except AiCheckError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    if args.output:
+        with open(args.output, "w") as fh:
+            json.dump(ai, fh, ensure_ascii=False)
+    r = ai["review"]
+    heads = {"de": ("Einschätzung", "Zuerst anhören", "Vermutlich Artefakte", "Muster", "Rückmeldung an den Musiker"),
+             "en": ("Assessment", "Listen first", "Likely artifacts", "Patterns", "Feedback for the musician")}[lang]
+    print(f"\n{heads[0]}:\n  {r['summary']}\n\n{heads[1]}:")
+    for item in r["listen_first"]:
+        print(f"  [{item['priority']}] {item['bars']}: {item['title']} – {item['reason']}")
+    if r["likely_artifacts"]:
+        print(f"\n{heads[2]}:")
+        for item in r["likely_artifacts"]:
+            print(f"  - {item['reason']}")
+    if r["patterns"]:
+        print(f"\n{heads[3]}:")
+        for p in r["patterns"]:
+            print(f"  - {p}")
+    print(f"\n{heads[4]}:\n{r['musician_feedback']}")
     return 0
 
 

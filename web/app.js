@@ -279,6 +279,7 @@ function renderAnalysis(id, meta, result, peaks) {
         <div class="group">${T.tuning} <span class="mono">${esc(tuningText)}</span>${result.tuning_cents != null ? `<span class="muted">(${result.tuning_cents >= 0 ? "+" : ""}${result.tuning_cents} ${T.cents})</span>` : ""}</div>
       </div>
     </section>
+    <section class="card ai-panel" id="ai-panel"></section>
     <div class="toolbar">
       <div class="group"><button class="btn play" id="play" title="${T.play}">▶</button>
         <span class="mono" id="clock">0:00.0</span></div>
@@ -823,12 +824,85 @@ function renderAnalysis(id, meta, result, peaks) {
   mq.addEventListener("change", draw);
   window.addEventListener("themechange", draw);
   cleanup = () => {
+    clearTimeout(aiTimer);
     audio.pause();
     document.removeEventListener("keydown", onKey);
     window.removeEventListener("resize", onResize);
     window.removeEventListener("themechange", draw);
     mq.removeEventListener("change", draw);
   };
+
+  // ---- KI-Check
+  // Server-Befund anspringen: Timing-Befunde rechnet die Oberfläche selbst neu (eigene IDs) – dann über die Note
+  function jumpToServerIssue(issueId) {
+    if (issues.some((i) => String(i.id) === String(issueId))) return selectIssue(issueId, true);
+    const srv = result.issues.find((i) => i.id === issueId);
+    if (!srv) return;
+    const local = srv.note_id != null && issues.find((i) => i.note_id === srv.note_id);
+    if (local) return selectIssue(local.id, true);
+    audio.currentTime = prerollStart(srv.time);
+    scroll.scrollLeft = Math.max(srv.time * state.pps - roll.clientWidth * 0.4, 0);
+    audio.play();
+    draw();
+  }
+  let aiTimer;
+  async function renderAi() {
+    const panel = $("#ai-panel");
+    if (!panel) return;
+    const [status, ai] = await Promise.all([api("/api/ai/status"), api(`/api/analyses/${id}/ai-check?lang=${LANG}`)]);
+    const head = `<div class="ai-head"><h2>✦ ${T.ai.title}</h2>
+      ${status.configured && ai.status !== "running" ? `<button class="btn small ${ai.result ? "" : "primary"}" id="ai-run">${ai.result ? T.ai.rerun : T.ai.run}</button>` : ""}</div>`;
+    const privacy = `<p class="muted small">${T.ai.privacy(status.model)}</p>`;
+    if (!status.configured) { panel.innerHTML = head + `<p class="muted">${T.ai.notConfigured}</p>`; return; }
+    if (ai.status === "running") {
+      panel.innerHTML = head + `<p class="muted"><span class="spinner"></span> ${T.ai.running}</p>`;
+      aiTimer = setTimeout(renderAi, 2000);
+      return;
+    }
+    let body = "";
+    if (ai.status === "error" && ai.error) body += `<p class="error">${esc(ai.error)}</p>`;
+    const r = ai.result?.review;
+    if (r) {
+      body += ai.stale ? `<p class="notice">${T.ai.stale}</p>` : "";
+      body += `<h3>${T.ai.summary}</h3><p>${esc(r.summary)}</p>`;
+      if (r.listen_first.length) {
+        body += `<h3>${T.ai.listen}</h3><ol class="ai-list">${r.listen_first.map((it, k) => `
+          <li class="ai-item" data-k="${k}"><span class="prio ${it.priority}">${T.ai.prio[it.priority] || it.priority}</span>
+            <b>${esc(it.bars)}</b> – ${esc(it.title)}<div class="muted">${esc(it.reason)}</div>
+            ${it.issue_ids.length ? `<div class="refs">${it.issue_ids.slice(0, 8).map((i) => `<a href="#" data-issue="${i}">#${i}</a>`).join(" ")}
+              <span class="muted">(${T.ai.findingsRef(it.issue_ids.length)})</span></div>` : ""}</li>`).join("")}</ol>`;
+      }
+      if (r.likely_artifacts.length) {
+        body += `<h3>${T.ai.artifacts}</h3><ul class="ai-list">${r.likely_artifacts.map((it) => `<li>${esc(it.reason)}
+          ${it.issue_ids.length ? `<div class="refs">${it.issue_ids.slice(0, 8).map((i) => `<a href="#" data-issue="${i}">#${i}</a>`).join(" ")}</div>` : ""}</li>`).join("")}</ul>`;
+      }
+      if (r.patterns.length) body += `<h3>${T.ai.patterns}</h3><ul class="ai-list">${r.patterns.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
+      body += `<h3>${T.ai.feedback} <button class="btn small" id="ai-copy">${T.ai.copyFeedback}</button></h3>
+        <blockquote class="ai-feedback">${esc(r.musician_feedback).replace(/\n/g, "<br>")}</blockquote>
+        <p class="muted small">${T.ai.disclaimer} · ${esc(ai.result.model)}</p>`;
+    }
+    const open = store.get("tc.aiOpen", true);
+    panel.innerHTML = head + (r ? "" : privacy) + (r ? `<details class="ai-body" ${open ? "open" : ""}><summary>${T.ai.details}</summary>${body}</details>` : body);
+    panel.querySelector(".ai-body")?.addEventListener("toggle", (ev) => store.set("tc.aiOpen", ev.target.open));
+    $("#ai-run")?.addEventListener("click", async (ev) => {
+      ev.target.disabled = true;
+      try {
+        await api(`/api/analyses/${id}/ai-check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lang: LANG }) });
+      } catch (e) { panel.insertAdjacentHTML("beforeend", `<p class="error">${esc(e.message)}</p>`); ev.target.disabled = false; return; }
+      renderAi();
+    });
+    panel.querySelectorAll("[data-issue]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); jumpToServerIssue(+a.dataset.issue); }));
+    panel.querySelectorAll(".ai-item").forEach((li) => li.addEventListener("click", (ev) => {
+      if (ev.target.closest("a")) return;
+      const first = r.listen_first[+li.dataset.k].issue_ids[0];
+      if (first != null) jumpToServerIssue(first);
+    }));
+    $("#ai-copy")?.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(r.musician_feedback); $("#ai-copy").textContent = T.copied; }
+      catch { prompt(T.copyPrompt, r.musician_feedback); }
+    });
+  }
+  renderAi();
 
   function refreshAll() { computeIssues(); renderStats(); renderIssues(); draw(); }
   sizeCanvases();

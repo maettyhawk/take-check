@@ -31,6 +31,7 @@ ID_RE = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$")
 
 app = FastAPI(title="Take Check")
 executor = ThreadPoolExecutor(max_workers=1)  # Analysen nacheinander – schont RAM/CPU der VM
+ai_executor = ThreadPoolExecutor(max_workers=2)  # KI-Checks warten auf die API, nicht auf die CPU
 meta_lock = Lock()
 
 
@@ -86,6 +87,61 @@ def _run(d: Path) -> None:
 @app.get("/api/tunings")
 def tunings() -> dict:
     return {"presets": {name: t for name, t in TUNING_PRESETS.items()}}
+
+
+def _run_ai_check(d: Path, lang: str) -> None:
+    from .ai_check import AiCheckError, run_ai_check
+
+    try:
+        result = json.loads((d / "result.json").read_text())
+        ai = run_ai_check(result, lang)
+        ai["created"] = time.time()
+        (d / f"ai_check_{lang}.json").write_text(json.dumps(ai, ensure_ascii=False))
+        _write_meta(d, **{f"ai_status_{lang}": "done", f"ai_error_{lang}": None})
+    except AiCheckError as exc:
+        _write_meta(d, **{f"ai_status_{lang}": "error", f"ai_error_{lang}": str(exc)})
+    except Exception as exc:  # unerwartet: festhalten statt den Worker zu verlieren
+        _write_meta(d, **{f"ai_status_{lang}": "error", f"ai_error_{lang}": f"{type(exc).__name__}: {exc}"})
+
+
+class AiCheckRequest(BaseModel):
+    lang: str = "de"
+
+
+@app.get("/api/ai/status")
+def ai_status() -> dict:
+    from .ai_check import MODEL, credentials_available
+    return {"configured": credentials_available(), "model": MODEL}
+
+
+@app.post("/api/analyses/{analysis_id}/ai-check")
+def start_ai_check(analysis_id: str, body: AiCheckRequest) -> dict:
+    from .ai_check import credentials_available
+    d = _dir(analysis_id)
+    lang = "en" if body.lang == "en" else "de"
+    if not (d / "result.json").exists():
+        raise HTTPException(409, "Analyse noch nicht fertig")
+    if not credentials_available():
+        raise HTTPException(400, "Kein Anthropic-API-Schlüssel: Server mit gesetztem ANTHROPIC_API_KEY starten")
+    if _read_meta(d).get(f"ai_status_{lang}") == "running":
+        return {"status": "running"}
+    _write_meta(d, **{f"ai_status_{lang}": "running", f"ai_error_{lang}": None})
+    ai_executor.submit(_run_ai_check, d, lang)
+    return {"status": "running"}
+
+
+@app.get("/api/analyses/{analysis_id}/ai-check")
+def get_ai_check(analysis_id: str, lang: str = "de") -> dict:
+    d = _dir(analysis_id)
+    lang = "en" if lang == "en" else "de"
+    meta = _read_meta(d)
+    path = d / f"ai_check_{lang}.json"
+    out = {"status": meta.get(f"ai_status_{lang}", "none"), "error": meta.get(f"ai_error_{lang}")}
+    if path.exists():
+        out["result"] = json.loads(path.read_text())
+        # Analyse neu berechnet → Befund-IDs passen nicht mehr zum KI-Check
+        out["stale"] = out["result"].get("created", 0) < meta.get("finished", 0)
+    return out
 
 
 @app.get("/api/profiles")
