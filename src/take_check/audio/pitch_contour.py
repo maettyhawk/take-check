@@ -6,7 +6,7 @@ import numpy as np
 from scipy.ndimage import median_filter
 
 from ..compare import Issues, NoteResult, note_name
-from ..i18n import tr
+from ..i18n import msg
 
 BPO = 60
 HARMONIC_BINS = (0, 60, 95)  # 1., 2., 3. Teilton
@@ -105,18 +105,16 @@ def evaluate_bends(tracker: PitchTracker, results: list[NoteResult], issues: Iss
         reached = float(np.percentile(rel[window] if window.sum() >= 3 else rel, 95))
         dev = (reached - target) * 100
         r.features["bend_reached"] = round(reached, 2)
-        label_de, label_en = f"{target:g} HT", f"{target:g} semitone" + ("s" if target != 1 else "")
+        amount = msg("semitones", n=f"{target:g}")
         if reached < 0.35 * target:
             issues.add("bend_missing", onset,
-                       tr(f"Bend fehlt: {note_name(n.pitch)} sollte um {label_de} gezogen werden",
-                          f"Bend missing: {note_name(n.pitch)} should be bent by {label_en}"),
+                       msg("bend_missing", note=note_name(n.pitch), amount=amount),
                        0.75, n, r.det, cents=round(dev))
             continue
         if abs(dev) > tol_cents:
-            word = tr("Bend zu tief", "Bend too flat") if dev < 0 else tr("Bend zu hoch", "Bend too sharp")
             issues.add("bend_pitch", onset,
-                       word + tr(f": {dev:+.0f} Cent am Zielton ({note_name(n.pitch)} + {label_de})",
-                                 f": {dev:+.0f} cents at the target ({note_name(n.pitch)} + {label_en})"),
+                       msg("bend_too_flat" if dev < 0 else "bend_too_sharp", cents=f"{dev:+.0f}",
+                           note=note_name(n.pitch), amount=amount),
                        0.5 + min(abs(dev) / 100, 0.4), n, r.det, cents=round(dev))
         if n.bend_timed:
             expected_peak = float(bt[np.argmax(bs >= 0.9 * target)])
@@ -125,22 +123,19 @@ def evaluate_bends(tracker: PitchTracker, results: list[NoteResult], issues: Iss
                 lateness = float((t - onset)[hit][0]) - expected_peak
                 if lateness > max(0.25, 0.2 * n.duration):
                     issues.add("bend_late", onset,
-                               tr(f"Bend kommt spät: Zielton {lateness * 1000:.0f} ms nach Vorgabe ({note_name(n.pitch)})",
-                                  f"Bend is late: target reached {lateness * 1000:.0f} ms after the notation ({note_name(n.pitch)})"),
+                               msg("bend_late", ms=f"{lateness * 1000:.0f}", note=note_name(n.pitch)),
                                0.35, n, r.det, delta_ms=round(lateness * 1000))
         if bs[0] >= 0.5:
             start = rel[t - onset <= 0.05]
             if len(start) and float(np.median(start)) < 0.5 * bs[0]:
                 issues.add("prebend_missing", onset,
-                           tr(f"Pre-Bend nicht vorgezogen: Ton wurde erst nach dem Anschlag hochgezogen ({note_name(n.pitch)})",
-                              f"Pre-bend not prepared: the note was bent up only after picking ({note_name(n.pitch)})"),
+                           msg("prebend_missing", note=note_name(n.pitch)),
                            0.55, n, r.det)
         if bs[-1] <= 0.1 * target and bs.max() > bs[-1]:
             tail = rel[t >= t[0] + 0.85 * (t[-1] - t[0])]
             if len(tail) and float(np.median(tail)) > 0.4:
                 issues.add("release_missing", onset,
-                           tr(f"Release unvollständig: endet {float(np.median(tail)) * 100:.0f} Cent über dem Ausgangston",
-                              f"Incomplete release: ends {float(np.median(tail)) * 100:.0f} cents above the starting note"),
+                           msg("release_incomplete", cents=f"{float(np.median(tail)) * 100:.0f}"),
                            0.55, n, r.det, cents=round(float(np.median(tail)) * 100))
 
 
@@ -167,8 +162,7 @@ def evaluate_unwanted(tracker: PitchTracker, results: list[NoteResult], issues: 
         sustained = float(np.percentile(rel, 80))
         if sustained > 0.4:
             issues.add("unwanted_bend", r.onset,
-                       tr(f"Ton gezogen/verstimmt ohne Bend-Vorgabe: {sustained * 100:+.0f} Cent ({note_name(n.pitch)})",
-                          f"Note pulled/out of tune without a notated bend: {sustained * 100:+.0f} cents ({note_name(n.pitch)})"),
+                       msg("unwanted_bend", cents=f"{sustained * 100:+.0f}", note=note_name(n.pitch)),
                        0.35, n, r.det, cents=round(sustained * 100))
             continue
         if not n.vibrato and (t[-1] - t[0]) >= 0.3:
@@ -177,6 +171,5 @@ def evaluate_unwanted(tracker: PitchTracker, results: list[NoteResult], issues: 
             depth = float(np.percentile(rel, 95) - np.percentile(rel, 5))
             if depth > 0.3 and crossings >= 6 and np.std(detr) < depth:
                 issues.add("vibrato_unexpected", r.onset,
-                           tr(f"Vibrato ohne Vorgabe ({depth * 100:.0f} Cent Tiefe, {note_name(n.pitch)})",
-                              f"Vibrato not notated ({depth * 100:.0f} cents deep, {note_name(n.pitch)})"),
+                           msg("vibrato_unexpected", cents=f"{depth * 100:.0f}", note=note_name(n.pitch)),
                            0.3, n, r.det, cents=round(depth * 100))

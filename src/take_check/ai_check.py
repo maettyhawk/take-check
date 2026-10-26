@@ -14,6 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .i18n import Msg, locales, msg, render, resolve_lang
+
 MODEL = "claude-opus-5-5"
 MAX_ISSUES = 400  # Befunde mit der höchsten Sicherheit; der Rest wird nur gezählt
 
@@ -42,7 +44,9 @@ class AiReview(BaseModel):
 
 
 class AiCheckError(RuntimeError):
-    pass
+    def __init__(self, message: Msg):
+        super().__init__(render(message, "en"))
+        self.message = message
 
 
 SYSTEM_PROMPT = """Du bist ein erfahrener Produzent und Gitarrist, der Aufnahmen von Session-Musikern Korrektur hört.
@@ -73,12 +77,6 @@ def _note_name(midi: int | None) -> str | None:
     return None if midi is None else f"{NOTE_NAMES[midi % 12]}{midi // 12 - 1}"
 
 
-def _text(value, lang: str) -> str:
-    if isinstance(value, dict):
-        return value.get(lang) or value.get("de", "")
-    return value or ""
-
-
 def build_context(result: dict, lang: str = "de") -> tuple[dict, set[int]]:
     """Kompakte, JSON-fähige Sicht auf das Analyseergebnis plus die Menge der gesendeten Befund-IDs."""
     notes = {n["id"]: n for n in result["notes"]}
@@ -93,7 +91,7 @@ def build_context(result: dict, lang: str = "de") -> tuple[dict, set[int]]:
         item = {
             "id": i["id"], "type": i["type"], "bar": i["bar"], "beat": i["beat"],
             "pass": i.get("occurrence", 1), "time_s": i["time"], "confidence": i["confidence"],
-            "message": _text(i.get("messages") or i.get("message"), lang),
+            "message": render(i.get("msg") or i.get("messages") or i.get("message"), lang),
         }
         n = notes.get(i.get("note_id"))
         if n is not None:
@@ -115,8 +113,8 @@ def build_context(result: dict, lang: str = "de") -> tuple[dict, set[int]]:
         "tuning_deviation_cents": result.get("tuning_cents"),
         "summary": result.get("summary"),
         "bars_total": len(result.get("bars", [])),
-        "warnings": [_text(w, lang) for w in result.get("warnings", [])],
-        "hints": [_text(h, lang) for h in result.get("hints", [])],
+        "warnings": [render(w, lang) for w in result.get("warnings", [])],
+        "hints": [render(h, lang) for h in result.get("hints", [])],
         "issues_by_type": dict(Counter(i["type"] for i in result["issues"])),
         "bars_with_confident_findings": [
             {"bar": b, "pass": occ, "count": c} for (b, occ), c in sorted(per_bar.items())],
@@ -157,8 +155,9 @@ def _client():
 def run_ai_check(result: dict, lang: str = "de", client=None) -> dict:
     import anthropic
 
+    lang = resolve_lang(lang)
     context, sent_ids = build_context(result, lang)
-    language = "Deutsch" if lang == "de" else "English"
+    language = locales()[lang]["meta"]["name"]
     task = (f"Hier sind die Analyseergebnisse als JSON. Antworte auf {language}.\n\n"
             f"<analysis>\n{json.dumps(context, ensure_ascii=False)}\n</analysis>")
     client = client or _client()
@@ -175,20 +174,20 @@ def run_ai_check(result: dict, lang: str = "de", client=None) -> dict:
             fallbacks="default",
         )
     except anthropic.AuthenticationError as exc:
-        raise AiCheckError("API-Schlüssel ungültig / invalid API key") from exc
+        raise AiCheckError(msg("ai_err_auth")) from exc
     except anthropic.PermissionDeniedError as exc:
-        raise AiCheckError("API-Schlüssel ohne Berechtigung / API key lacks permission") from exc
+        raise AiCheckError(msg("ai_err_permission")) from exc
     except anthropic.RateLimitError as exc:
-        raise AiCheckError("Rate-Limit erreicht, bitte später erneut / rate limited, try again later") from exc
+        raise AiCheckError(msg("ai_err_rate")) from exc
     except anthropic.APIConnectionError as exc:
-        raise AiCheckError("Keine Verbindung zur Anthropic-API / cannot reach the Anthropic API") from exc
+        raise AiCheckError(msg("ai_err_connection")) from exc
     except anthropic.APIStatusError as exc:
-        raise AiCheckError(f"API-Fehler {exc.status_code}: {exc.message}") from exc
+        raise AiCheckError(msg("ai_err_api", status=exc.status_code, message=exc.message)) from exc
 
     if response.stop_reason == "refusal":
-        raise AiCheckError("Die KI hat die Anfrage abgelehnt / the request was declined")
+        raise AiCheckError(msg("ai_err_refusal"))
     if response.stop_reason == "max_tokens" or response.parsed_output is None:
-        raise AiCheckError("Antwort unvollständig / incomplete response")
+        raise AiCheckError(msg("ai_err_incomplete"))
 
     review = response.parsed_output.model_dump()
     # nur Verweise auf tatsächlich gesendete Befunde behalten

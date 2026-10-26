@@ -22,11 +22,3 @@ def test_profile_inherits_and_validates(tmp_path):
         load_profile("gibtsnicht", tmp_path)
     with pytest.raises(ValueError, match="Ungültiger"):
         load_profile("../etc", tmp_path)
-
-
-def test_i18n_text_concatenation():
-    from take_check.i18n import as_text, pick, tr
-    t = tr("Fehlende Note: ", "Missing note: ") + "G2" + tr(" (Akkord)", " (chord)")
-    assert t == {"de": "Fehlende Note: G2 (Akkord)", "en": "Missing note: G2 (chord)"}
-    assert str(t) == "Fehlende Note: G2 (Akkord)" and pick(t, "en") == "Missing note: G2 (chord)"
-    assert as_text("nur deutsch") == {"de": "nur deutsch", "en": "nur deutsch"}

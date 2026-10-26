@@ -6,7 +6,7 @@ from pathlib import Path
 
 import mido
 
-from ..i18n import tr
+from ..i18n import msg
 from .model import Bar, Score, ScoreNote
 
 
@@ -37,14 +37,11 @@ def parse_midi(path: str | Path) -> Score:
         if notes:
             tracks_notes.append(notes)
 
-    warnings = [tr("MIDI-Vorlage: Palm Mute, Legato, Bends und Flageoletts werden nicht geprüft.",
-                   "MIDI score: palm mutes, legato, bends and harmonics are not checked.")]
+    warnings = [msg("midi_no_articulation")]
     if not tracks_notes:
-        return Score(notes=[], bars=[], warnings=warnings + [tr("Die MIDI-Datei enthält keine Noten.",
-                                                                "The MIDI file contains no notes.")])
+        return Score(notes=[], bars=[], warnings=warnings + [msg("midi_no_notes")])
     if len(tracks_notes) > 1:
-        warnings.append(tr("Mehrere Spuren mit Noten gefunden – verwendet wird die mit den meisten Noten.",
-                           "Several tracks with notes found – using the one with the most notes."))
+        warnings.append(msg("midi_multiple_tracks"))
     raw = max(tracks_notes, key=len)
 
     tempo_events.sort()

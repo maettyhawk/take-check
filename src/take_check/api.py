@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .compare import Options
+from .i18n import languages, locales, msg, resolve_lang, to_json
 from .profile import list_profiles, load_profile
 from .score.guitar import TUNING_PRESETS, parse_tuning
 
@@ -35,12 +36,17 @@ ai_executor = ThreadPoolExecutor(max_workers=2)  # KI-Checks warten auf die API,
 meta_lock = Lock()
 
 
+def _error(status: int, key: str, **params) -> HTTPException:
+    """Fehler mit übersetzbarem Text: die Oberfläche rendert `detail` in der gewählten Sprache."""
+    return HTTPException(status, to_json(msg(key, **params)))
+
+
 def _dir(analysis_id: str) -> Path:
     if not ID_RE.match(analysis_id):
-        raise HTTPException(404, "Unbekannte Analyse")
+        raise _error(404, "err_unknown_analysis")
     d = DATA / analysis_id
     if not d.is_dir():
-        raise HTTPException(404, "Unbekannte Analyse")
+        raise _error(404, "err_unknown_analysis")
     return d
 
 
@@ -62,7 +68,7 @@ def _run(d: Path) -> None:
     from .analyze import RESULT_VERSION, SR, analyze, load_audio, waveform_peaks
 
     meta = _read_meta(d)
-    _write_meta(d, status="running", stage="Start", progress=0.0, error=None)
+    _write_meta(d, status="running", stage="start", progress=0.0, error=None)
     try:
         tuning = parse_tuning(meta["tuning"]) if meta.get("tuning") else None
         profile = load_profile(meta.get("profile"))
@@ -77,11 +83,11 @@ def _run(d: Path) -> None:
             (d / "peaks.json").write_text(json.dumps({"per_second": 100, "duration": len(y) / SR,
                                                       "peaks": waveform_peaks(y)}))
         s = result["summary"]
-        _write_meta(d, status="done", stage="Fertig", progress=1.0, title=result["title"], result_version=RESULT_VERSION,
+        _write_meta(d, status="done", stage="done", progress=1.0, title=result["title"], result_version=RESULT_VERSION,
                     offset=result["offset"], notes_checked=s["notes_checked"], notes_ok=s["notes_ok"],
                     issue_count=len(result["issues"]), finished=time.time())
     except Exception as exc:  # Fehler für die Oberfläche festhalten
-        _write_meta(d, status="error", stage="Fehler", error=str(exc), traceback=traceback.format_exc())
+        _write_meta(d, status="error", stage="error", error=str(exc), traceback=traceback.format_exc())
 
 
 @app.get("/api/tunings")
@@ -99,9 +105,10 @@ def _run_ai_check(d: Path, lang: str) -> None:
         (d / f"ai_check_{lang}.json").write_text(json.dumps(ai, ensure_ascii=False))
         _write_meta(d, **{f"ai_status_{lang}": "done", f"ai_error_{lang}": None})
     except AiCheckError as exc:
-        _write_meta(d, **{f"ai_status_{lang}": "error", f"ai_error_{lang}": str(exc)})
+        _write_meta(d, **{f"ai_status_{lang}": "error", f"ai_error_{lang}": to_json(exc.message)})
     except Exception as exc:  # unerwartet: festhalten statt den Worker zu verlieren
-        _write_meta(d, **{f"ai_status_{lang}": "error", f"ai_error_{lang}": f"{type(exc).__name__}: {exc}"})
+        _write_meta(d, **{f"ai_status_{lang}": "error",
+                          f"ai_error_{lang}": to_json(msg("ai_err_unexpected", error=f"{type(exc).__name__}: {exc}"))})
 
 
 class AiCheckRequest(BaseModel):
@@ -118,11 +125,11 @@ def ai_status() -> dict:
 def start_ai_check(analysis_id: str, body: AiCheckRequest) -> dict:
     from .ai_check import credentials_available
     d = _dir(analysis_id)
-    lang = "en" if body.lang == "en" else "de"
+    lang = resolve_lang(body.lang)
     if not (d / "result.json").exists():
-        raise HTTPException(409, "Analyse noch nicht fertig")
+        raise _error(409, "err_not_ready")
     if not credentials_available():
-        raise HTTPException(400, "Kein Anthropic-API-Schlüssel: Server mit gesetztem ANTHROPIC_API_KEY starten")
+        raise _error(400, "err_no_api_key")
     if _read_meta(d).get(f"ai_status_{lang}") == "running":
         return {"status": "running"}
     _write_meta(d, **{f"ai_status_{lang}": "running", f"ai_error_{lang}": None})
@@ -133,7 +140,7 @@ def start_ai_check(analysis_id: str, body: AiCheckRequest) -> dict:
 @app.get("/api/analyses/{analysis_id}/ai-check")
 def get_ai_check(analysis_id: str, lang: str = "de") -> dict:
     d = _dir(analysis_id)
-    lang = "en" if lang == "en" else "de"
+    lang = resolve_lang(lang)
     meta = _read_meta(d)
     path = d / f"ai_check_{lang}.json"
     out = {"status": meta.get(f"ai_status_{lang}", "none"), "error": meta.get(f"ai_error_{lang}")}
@@ -142,6 +149,19 @@ def get_ai_check(analysis_id: str, lang: str = "de") -> dict:
         # Analyse neu berechnet → Befund-IDs passen nicht mehr zum KI-Check
         out["stale"] = out["result"].get("created", 0) < meta.get("finished", 0)
     return out
+
+
+@app.get("/api/locales")
+def list_locales() -> list[dict]:
+    return languages()
+
+
+@app.get("/api/locales/{code}")
+def get_locale(code: str) -> dict:
+    data = locales().get(code)
+    if data is None:
+        raise HTTPException(404, "unknown locale")
+    return data
 
 
 @app.get("/api/profiles")
@@ -169,9 +189,9 @@ async def create_analysis(score: UploadFile = File(...), audio: UploadFile = Fil
     s_ext = Path(score.filename or "").suffix.lower()
     a_ext = Path(audio.filename or "").suffix.lower()
     if s_ext not in SCORE_EXT:
-        raise HTTPException(400, f"Vorlage muss {', '.join(sorted(SCORE_EXT))} sein")
+        raise _error(400, "err_score_ext", exts=", ".join(sorted(SCORE_EXT)))
     if a_ext not in AUDIO_EXT:
-        raise HTTPException(400, f"Aufnahme muss {', '.join(sorted(AUDIO_EXT))} sein")
+        raise _error(400, "err_audio_ext", exts=", ".join(sorted(AUDIO_EXT)))
     if tuning.strip():
         try:
             parse_tuning(tuning)
@@ -187,7 +207,7 @@ async def create_analysis(score: UploadFile = File(...), audio: UploadFile = Fil
     for upload, name in ((score, f"score{s_ext}"), (audio, f"audio{a_ext}")):
         with open(d / name, "wb") as fh:
             shutil.copyfileobj(upload.file, fh, length=1 << 20)
-    _write_meta(d, id=analysis_id, created=time.time(), status="queued", stage="Wartet", progress=0.0,
+    _write_meta(d, id=analysis_id, created=time.time(), status="queued", stage="queued", progress=0.0,
                 score_name=score.filename, audio_name=audio.filename, score_file=f"score{s_ext}",
                 audio_file=f"audio{a_ext}", tuning=tuning.strip() or None, timing_tol_ms=timing_tol_ms,
                 profile=profile)
@@ -215,7 +235,7 @@ def rerun(analysis_id: str, body: Rerun) -> dict:
         _write_meta(d, offset_manual=None)
     elif body.offset is not None:
         _write_meta(d, offset_manual=body.offset)
-    _write_meta(d, status="queued", stage="Wartet", progress=0.0)
+    _write_meta(d, status="queued", stage="queued", progress=0.0)
     executor.submit(_run, d)
     return {"id": analysis_id}
 
@@ -233,7 +253,7 @@ def get_meta(analysis_id: str) -> dict:
 def get_result(analysis_id: str):
     path = _dir(analysis_id) / "result.json"
     if not path.exists():
-        raise HTTPException(404, "Noch kein Ergebnis")
+        raise _error(404, "err_no_result")
     return FileResponse(path, media_type="application/json")
 
 
@@ -241,7 +261,7 @@ def get_result(analysis_id: str):
 def get_peaks(analysis_id: str):
     path = _dir(analysis_id) / "peaks.json"
     if not path.exists():
-        raise HTTPException(404, "Noch keine Wellenform")
+        raise _error(404, "err_no_peaks")
     return FileResponse(path, media_type="application/json")
 
 
@@ -255,7 +275,7 @@ def get_audio(analysis_id: str):
 def delete_analysis(analysis_id: str) -> JSONResponse:
     d = _dir(analysis_id)
     if _read_meta(d).get("status") in ("queued", "running"):
-        raise HTTPException(409, "Analyse läuft noch")
+        raise _error(409, "err_analysis_running")
     shutil.rmtree(d)
     return JSONResponse({"deleted": analysis_id})
 

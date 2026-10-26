@@ -12,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 
 from ..compare import Issues, NoteResult, note_name
-from ..i18n import tr
+from ..i18n import msg
 from ..profile import Strum
 from .transcribe import MIDI_OFFSET, Transcription
 
@@ -93,6 +93,5 @@ def evaluate(results: list[NoteResult], trans: Transcription, issues: Issues, cf
             arrow = {"down": " ↓", "up": " ↑"}.get(direction, "")
             names = "·".join(note_name(r.note.pitch) for r in sorted(g, key=lambda r: r.note.pitch))
             issues.add("slow_strum", attack,
-                       tr(f"Akkordanschlag verschleppt: {spread * 1000:.0f} ms von erster bis letzter Saite ({names}{arrow})",
-                          f"Dragged strum: {spread * 1000:.0f} ms from first to last string ({names}{arrow})"),
+                       msg("slow_strum", ms=f"{spread * 1000:.0f}", notes=names, arrow=arrow),
                        0.35, lead.note, lead.det, delta_ms=round(spread * 1000))

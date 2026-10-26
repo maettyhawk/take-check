@@ -4,6 +4,7 @@ import numpy as np
 
 from take_check.audio import chord_check
 from take_check.compare import Issues, NoteResult
+from take_check.i18n import render
 from take_check.profile import Chords
 from take_check.score.model import Bar, Score, ScoreNote
 
@@ -48,7 +49,7 @@ def _top_missing_everywhere(monkeypatch, palm_mute):
 def test_quiet_upper_tone_in_palm_mute_is_typical_not_an_error(monkeypatch):
     results, issues, warnings = _top_missing_everywhere(monkeypatch, palm_mute=True)
     assert issues.items == [] and warnings == []
-    assert len(issues.hints) == 1 and "Typisch für Palm Mute" in str(issues.hints[0]) and "Takte: 1–6" in str(issues.hints[0])
+    assert len(issues.hints) == 1 and "Typisch für Palm Mute" in render(issues.hints[0], "de") and "Takte: 1–6" in render(issues.hints[0], "de")
     assert all(r.status == "unchecked" for r in results if r.note.pitch == 62)
     # C4 ist Oberton von C3 und wird nicht als fehlend behandelt
     assert all(r.features["masked"] for r in results if r.note.pitch == 60)
@@ -60,7 +61,7 @@ def test_systematic_omission_without_palm_mute_is_downgraded_and_warned(monkeypa
     assert len(omitted) == 24 and all(i["confidence"] <= chord_check.OMITTED_MAX_CONFIDENCE for i in omitted)
     assert not [i for i in issues.items if i["type"] == "missing"]
     assert all(r.status == "omitted" for r in results if r.note.pitch == 62)
-    assert len(warnings) == 1 and "Saite 2" in str(warnings[0]) and "nicht sicher" in str(warnings[0])
+    assert len(warnings) == 1 and "Saite 2" in render(warnings[0], "de") and "nicht sicher" in render(warnings[0], "de")
 
 
 def _occasional(monkeypatch, palm_mute):

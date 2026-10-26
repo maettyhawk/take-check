@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..compare import Issues, NoteResult, note_name
-from ..i18n import tr
+from ..i18n import msg
 from .pitch_contour import BPO, PitchTracker
 
 PARTIAL_BINS = [round(BPO * np.log2(k)) for k in range(1, 9)]
@@ -56,6 +56,5 @@ def evaluate(tracker: PitchTracker, results: list[NoteResult], issues: Issues) -
             continue
         if v <= float(np.median(ref)):
             issues.add("harmonic_timbre", r.onset,
-                       tr(f"Klingt eher gegriffen als nach Flageolett ({note_name(r.det.pitch)}) – experimentell",
-                          f"Sounds fretted rather than like a harmonic ({note_name(r.det.pitch)}) – experimental"),
+                       msg("harmonic_timbre", note=note_name(r.det.pitch)),
                        0.35, n, r.det)

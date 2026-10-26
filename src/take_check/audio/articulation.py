@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..compare import Issues, NoteResult, note_name
-from ..i18n import tr
+from ..i18n import msg
 from ..profile import PalmMute
 
 HF_BAND = (2500.0, 8000.0)
@@ -182,11 +182,7 @@ def _evaluate_palm_mute(results: list[NoteResult], rs: list[NoteResult], issues:
         if separation > 0.8:  # offene Noten klingen länger/heller als gedämpfte
             scales.append((feat, m_pm, m_op))
     if not scales:
-        warnings.append(tr("Palm Mutes und offene Noten klingen in dieser Aufnahme kaum unterschiedlich – "
-                           "möglicherweise wurde durchgehend gedämpft oder gar nicht gedämpft. "
-                           "Palm-Mute-Prüfung pro Note übersprungen.",
-                           "Palm-muted and open notes sound almost the same in this take – possibly everything "
-                           "was muted or nothing was. Per-note palm mute check skipped."))
+        warnings.append(msg("pm_indistinct"))
         return
     per_feature: dict[int, list[float]] = {}
     for r in pm + open_:
@@ -219,17 +215,14 @@ def _evaluate_palm_mute(results: list[NoteResult], rs: list[NoteResult], issues:
             local = float(np.median(pm_open[near])) if near.sum() >= 4 else 0.0
             if openness - local < cfg.outlier_margin:
                 continue
-            msg = tr(f"Palm Mute fehlt: {note_name(n.pitch)} klingt offen",
-                     f"Palm mute missing: {note_name(n.pitch)} rings open")
+            text = msg("pm_missing", note=note_name(n.pitch))
             if n.id in lift:
                 factor *= cfg.lift_confidence_factor
-                msg += tr(" (Taktanfang/Wechsel – hier wird der Handballen oft kurz angehoben)",
-                          " (downbeat/change – players often lift the palm briefly here)")
-            issues.add("pm_missing", r.onset, msg, (0.4 + 0.4 * min(openness - 0.75, 1.0)) * factor, n, r.det)
+                text += msg("pm_lift_suffix")
+            issues.add("pm_missing", r.onset, text, (0.4 + 0.4 * min(openness - 0.75, 1.0)) * factor, n, r.det)
         elif not n.palm_mute and clearly_muted:
             issues.add("pm_unexpected", r.onset,
-                       tr(f"Gedämpft gespielt, aber kein Palm Mute notiert: {note_name(n.pitch)}",
-                          f"Played muted, but no palm mute notated: {note_name(n.pitch)}"),
+                       msg("pm_unexpected", note=note_name(n.pitch)),
                        (0.3 + 0.3 * min(0.25 - openness, 1.0)) * factor, n, r.det)
 
 
@@ -245,8 +238,7 @@ def _evaluate_legato(rs: list[NoteResult], issues: Issues) -> None:
         a = r.features.get("attack_db", np.nan)
         if np.isfinite(a) and a > q25 and a > 3.0:
             issues.add("legato_picked", r.onset,
-                       tr(f"Angeschlagen statt Legato (Hammer-on/Pull-off): {note_name(r.note.pitch)}",
-                          f"Picked instead of legato (hammer-on/pull-off): {note_name(r.note.pitch)}"),
+                       msg("legato_picked", note=note_name(r.note.pitch)),
                        0.4 + 0.4 * min((a - q25) / (2 * mad), 1.0), r.note, r.det)
     onsets: dict[float, int] = {}
     for r in picked:
@@ -256,6 +248,5 @@ def _evaluate_legato(rs: list[NoteResult], issues: Issues) -> None:
         single = onsets[round(r.note.onset, 3)] == 1
         if single and np.isfinite(a) and a < med - 3 * mad and a < 3.0:
             issues.add("picked_legato", r.onset,
-                       tr(f"Kein Anschlag hörbar (gebunden statt angeschlagen?): {note_name(r.note.pitch)}",
-                          f"No pick attack audible (legato instead of picked?): {note_name(r.note.pitch)}"),
+                       msg("picked_legato", note=note_name(r.note.pitch)),
                        0.35, r.note, r.det)

@@ -1,6 +1,6 @@
 [project]
 name = "take-check"
-version = "1.1.0"
+version = "1.1.1"
 description = "Instrumentaufnahme gegen Vorlage prüfen – Gitarren-Takes (DI) mit Guitar-Pro-/MusicXML-Vorlagen vergleichen"
 requires-python = ">=3.12,<3.13"
 dependencies = [

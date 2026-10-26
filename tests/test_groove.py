@@ -2,6 +2,7 @@
 
 from take_check.audio.transcribe import DetectedNote
 from take_check.compare import Issues, NoteResult, Options, timing_issues
+from take_check.i18n import render
 from take_check.score.model import Bar, Score, ScoreNote
 
 
@@ -28,7 +29,7 @@ def _take(lag_by_bar, outlier=None):
 def test_consistent_push_is_a_hint_not_an_error():
     issues = _take((0.020, 0.0))
     assert [i for i in issues.items if i["type"] in ("early", "late")] == []
-    assert len(issues.hints) == 1 and "T. 1–4" in str(issues.hints[0]) and "hinter dem Klick" in str(issues.hints[0])
+    assert len(issues.hints) == 1 and "T. 1–4" in render(issues.hints[0], "de") and "hinter dem Klick" in render(issues.hints[0], "de")
 
 
 def test_outlier_against_groove_is_reported():

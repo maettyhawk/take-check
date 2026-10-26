@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
 
     k = sub.add_parser("ai-check", help="KI-Einschätzung zu einem gespeicherten Ergebnis (JSON aus 'analyze -o')")
     k.add_argument("result", help="Ergebnisdatei aus 'take-check analyze -o'")
-    k.add_argument("--lang", choices=["de", "en"], help="Sprache der Antwort (Standard: aus $LANG)")
+    k.add_argument("--lang", help="Sprache der Antwort, z. B. de oder en (Standard: aus $LANG)")
     k.add_argument("-o", "--output", help="KI-Check als JSON speichern")
 
     s = sub.add_parser("serve", help="Web-Oberfläche starten")
@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
         return _ai_check(args)
 
     from .analyze import analyze
-    from .i18n import cli_lang, pick
+    from .i18n import cli_lang, msg, render, ui
     from .score.guitar import parse_tuning
 
     lang = cli_lang()
@@ -50,67 +50,57 @@ def main(argv: list[str] | None = None) -> int:
     tuning = parse_tuning(args.tuning) if args.tuning else None
     opts = Options(timing_tol=args.timing_tol / 1000) if args.timing_tol else None
     result = analyze(args.score, args.audio, opts, tuning=tuning, offset=args.offset, profile=args.profile,
-                     progress=lambda stage, f: print(f"[{f:4.0%}] {stage}", file=sys.stderr))
+                     progress=lambda stage, f: print(f"[{f:4.0%}] {ui('stages.' + stage, lang)}", file=sys.stderr))
     if args.output:
         with open(args.output, "w") as fh:
             json.dump(result, fh, ensure_ascii=False)
     summary = result["summary"]
-    if lang == "de":
-        print(f"\n{result['title']}: {summary['notes_ok']}/{summary['notes_checked']} Noten ohne Befund, "
-              f"Versatz {result['offset']:+.3f} s")
-    else:
-        print(f"\n{result['title']}: {summary['notes_ok']}/{summary['notes_checked']} notes without findings, "
-              f"offset {result['offset']:+.3f} s")
+    print("\n" + render(msg("cli_summary", title=result["title"], ok=summary["notes_ok"],
+                             checked=summary["notes_checked"], offset=f"{result['offset']:+.3f}"), lang))
     for w in result["warnings"]:
-        print(f"  ! {pick(w, lang)}")
+        print(f"  ! {render(w, lang)}")
     for h in result["hints"]:
-        print(f"  i {pick(h, lang)}")
+        print(f"  i {render(h, lang)}")
     shown = [i for i in result["issues"] if i["confidence"] >= args.min_confidence]
     for i in sorted(shown, key=lambda i: i["time"]):
-        if lang == "de":
-            occ = f" ({i['occurrence']}. Durchgang)" if i["occurrence"] > 1 else ""
-            where = f"T. {i['bar']}{occ} Zz. {i['beat']:<5}"
-        else:
-            occ = f" (pass {i['occurrence']})" if i["occurrence"] > 1 else ""
-            where = f"Bar {i['bar']}{occ} beat {i['beat']:<5}"
-        print(f"  {where} {i['time']:7.2f}s  [{i['confidence']:.2f}]  {pick(i.get('messages', i['message']), lang)}")
+        passed = msg("cli_where_pass", n=i["occurrence"]) if i["occurrence"] > 1 else ""
+        where = render(msg("cli_where", bar=i["bar"], beat=f"{i['beat']:<5}", **{"pass": passed}), lang)
+        print(f"  {where} {i['time']:7.2f}s  [{i['confidence']:.2f}]  {render(i.get('msg') or i['message'], lang)}")
     return 0
 
 
 def _ai_check(args) -> int:
     from .ai_check import AiCheckError, credentials_available, run_ai_check
-    from .i18n import cli_lang
+    from .i18n import cli_lang, msg, render, resolve_lang
 
-    lang = args.lang or cli_lang()
+    lang = resolve_lang(args.lang) if args.lang else cli_lang()
+    t = lambda key: render(msg(key), lang)  # noqa: E731
     if not credentials_available():
-        print("Kein Anthropic-API-Schlüssel gefunden (ANTHROPIC_API_KEY setzen)." if lang == "de"
-              else "No Anthropic API key found (set ANTHROPIC_API_KEY).", file=sys.stderr)
+        print(t("cli_no_api_key"), file=sys.stderr)
         return 2
     with open(args.result) as fh:
         result = json.load(fh)
     try:
         ai = run_ai_check(result, lang)
     except AiCheckError as exc:
-        print(exc, file=sys.stderr)
+        print(render(exc.message, lang), file=sys.stderr)
         return 1
     if args.output:
         with open(args.output, "w") as fh:
             json.dump(ai, fh, ensure_ascii=False)
     r = ai["review"]
-    heads = {"de": ("Einschätzung", "Zuerst anhören", "Vermutlich Artefakte", "Muster", "Rückmeldung an den Musiker"),
-             "en": ("Assessment", "Listen first", "Likely artifacts", "Patterns", "Feedback for the musician")}[lang]
-    print(f"\n{heads[0]}:\n  {r['summary']}\n\n{heads[1]}:")
+    print(f"\n{t('cli_ai_assessment')}:\n  {r['summary']}\n\n{t('cli_ai_listen')}:")
     for item in r["listen_first"]:
         print(f"  [{item['priority']}] {item['bars']}: {item['title']} – {item['reason']}")
     if r["likely_artifacts"]:
-        print(f"\n{heads[2]}:")
+        print(f"\n{t('cli_ai_artifacts')}:")
         for item in r["likely_artifacts"]:
             print(f"  - {item['reason']}")
     if r["patterns"]:
-        print(f"\n{heads[3]}:")
+        print(f"\n{t('cli_ai_patterns')}:")
         for p in r["patterns"]:
             print(f"  - {p}")
-    print(f"\n{heads[4]}:\n{r['musician_feedback']}")
+    print(f"\n{t('cli_ai_feedback')}:\n{r['musician_feedback']}")
     return 0
 
 

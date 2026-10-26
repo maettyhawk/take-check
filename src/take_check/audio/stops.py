@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..compare import Issues, NoteResult, note_name
-from ..i18n import tr
+from ..i18n import msg
 from ..profile import Stops
 from ..score.model import ScoreNote
 from .pitch_contour import PitchTracker
@@ -77,24 +77,18 @@ def evaluate(y: np.ndarray, sr: int, tracker: PitchTracker, notes: list[ScoreNot
     med = float(np.median(rel))
     mad = max(float(np.median(np.abs(rel - med))) * 1.4826, 2.0)
     if med > cfg.max_level_db:
-        warnings.append(tr(f"Pausen klingen in dieser Aufnahme generell nach (im Mittel {abs(med):.0f} dB unter dem "
-                           "Spielpegel) – gemeldet werden nur die auffälligsten Stellen.",
-                           f"Rests generally keep ringing in this take (on average {abs(med):.0f} dB below the playing "
-                           "level) – only the most noticeable ones are reported."))
+        warnings.append(msg("rests_ringing_general", db=f"{abs(med):.0f}"))
     for start, end, a, b, level, r, held in measured:
         if r <= cfg.max_level_db or level - floor < cfg.min_above_floor_db or r - med <= cfg.outlier_mad * mad:
             continue
         ringing = _ringing_pitch(y, sr, a, b, min(n.pitch for n in notes))
-        what = tr(f" ({note_name(ringing)} klingt nach)", f" ({note_name(ringing)} keeps ringing)") if ringing else ""
+        what = msg("rest_ringing_note", note=note_name(ringing)) if ringing else ""
         conf = float(np.clip(0.5 + (r - cfg.max_level_db) / 30, 0.5, 0.85))
-        rest_ms = f"{(end - start) * 1000:.0f} ms"
-        message = tr(f"Pause nicht abgedämpft: {abs(r):.0f} dB unter Spielpegel", f"Rest not muted: {abs(r):.0f} dB "
-                     "below playing level") + what + tr(f", {rest_ms} Pause", f", {rest_ms} rest")
+        message = msg("rest_ringing", db=f"{abs(r):.0f}", ringing=what, ms=f"{(end - start) * 1000:.0f}")
         if held >= cfg.natural_decay_after_s:
             # lang gehaltener Ton, der natürlich ausklingt: oft bewusste Phrasierung
             conf *= cfg.natural_decay_factor
-            message += tr(" – nach lang gehaltenem Ton, evtl. bewusst ausklingen lassen",
-                          " – after a long held note, possibly left to decay on purpose")
+            message += msg("rest_decay_suffix")
         issues.add("rest_ringing", start, message,
                    conf, None, None, level_db=round(r, 1),
                    rest_end=round(end, 4), played_pitch=ringing)

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import guitar
-from ..i18n import tr
+from ..i18n import msg
 from .model import Bar, Score, ScoreNote
 
 STEP_SEMITONES = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
@@ -313,10 +313,7 @@ def _parse_part(part: ET.Element, staff_filter: str | None, warnings: list[str],
                         raw.pitch = guitar.fretted_pitch(tuning, raw.string, raw.fret, capo)
                     elif not warned_strings:
                         warned_strings = True
-                        warnings.append(tr(f"Vorlage nutzt Saite {raw.string}, die Stimmung hat aber nur "
-                                           f"{len(tuning)} Saiten – notierte Tonhöhen werden verwendet.",
-                                           f"The score uses string {raw.string}, but the tuning only has "
-                                           f"{len(tuning)} strings – using notated pitches."))
+                        warnings.append(msg("score_string_exceeds", string=raw.string, strings=len(tuning)))
                 m.notes.append(raw)
             elif tag == "backup":
                 cursor -= _int(el.findtext("duration"))
@@ -513,13 +510,11 @@ def parse_musicxml(path: str | Path, tuning: list[int] | None = None) -> Score:
     part, part_name = _choose_part(root)
     if len(root.findall("part")) > 1:
         name = part_name or part.get("id")
-        warnings.append(tr(f"Mehrere Spuren gefunden, verwendet wird: „{name}“.", f"Several tracks found, using: “{name}”."))
+        warnings.append(msg("score_multiple_tracks", name=name))
     staff_filter = _choose_staff(part)
     measures, tuning, capo = _parse_part(part, staff_filter, warnings, tuning)
     if tuning is None:
-        warnings.append(tr("Keine Stimmung in der Vorlage gefunden – es werden die notierten Tonhöhen verwendet. "
-                           "Bei Bedarf Stimmung manuell angeben.",
-                           "No tuning found in the score – using notated pitches. Set the tuning manually if needed."))
+        warnings.append(msg("score_no_tuning"))
     title = root.findtext("work/work-title") or root.findtext("movement-title") or path.stem
     return build_score(measures, tuning, capo, title, warnings)
 
@@ -570,7 +565,7 @@ def build_score(measures: list[_Measure], tuning: list[int] | None, capo: int, t
     for k, n in enumerate(notes):
         n.id = k
     if not notes:
-        warnings.append(tr("Die Vorlage enthält keine Noten.", "The score contains no notes."))
+        warnings.append(msg("score_no_notes"))
     return Score(notes=notes, bars=bars, tuning=tuning, title=title, warnings=warnings)
 
 

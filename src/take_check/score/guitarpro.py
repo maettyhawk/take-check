@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from ..i18n import tr
+from ..i18n import msg
 from .model import Score
 from .musicxml import _Measure, _RawNote, build_score
 
@@ -106,14 +106,12 @@ def parse_gp(path: str | Path, tuning: list[int] | None = None) -> Score:
     track = tracks[track_idx]
     track_name = track.findtext("Name") or f"Spur {track_idx + 1}"
     if len(candidates) > 1:
-        warnings.append(tr(f"Mehrere Spuren mit Noten gefunden, verwendet wird: „{track_name}“.",
-                           f"Several tracks with notes found, using: “{track_name}”."))
+        warnings.append(msg("score_multiple_tracks", name=track_name))
 
     pitches = track.find(".//Property[@name='Tuning']/Pitches")
     file_tuning = [int(p) for p in pitches.text.split()] if pitches is not None and pitches.text else None
     if file_tuning is None:
-        warnings.append(tr("Keine Stimmung in der Datei gefunden – Standardstimmung angenommen.",
-                           "No tuning found in the file – assuming standard tuning."))
+        warnings.append(msg("score_no_tuning_assumed"))
         file_tuning = [40, 45, 50, 55, 59, 64]
     tuning = tuning or file_tuning
     capo = int(_float(track.findtext(".//Property[@name='CapoFret']/Fret"), 0))
@@ -127,8 +125,7 @@ def parse_gp(path: str | Path, tuning: list[int] | None = None) -> Score:
         bar = int(_float(auto.findtext("Bar"), 0))
         tempo_events.setdefault(bar, []).append((_float(auto.findtext("Position"), 0), bpm))
         if auto.findtext("Linear") == "true":
-            warnings.append(tr(f"Takt {bar + 1}: Tempo-Übergänge (accelerando/ritardando) werden stufenweise angenähert.",
-                               f"Bar {bar + 1}: tempo transitions (accelerando/ritardando) are approximated in steps."))
+            warnings.append(msg("score_tempo_ramp", bar=bar + 1))
 
     measures: list[_Measure] = []
     ending_block, last_endings = 0, None
@@ -194,8 +191,7 @@ def parse_gp(path: str | Path, tuning: list[int] | None = None) -> Score:
                             continue
                         if raw.string is None and not warned_strings:
                             warned_strings = True
-                            warnings.append(tr("Vorlage nutzt mehr Saiten als die Stimmung – notierte Tonhöhen verwendet.",
-                                               "The score uses more strings than the tuning has – using notated pitches."))
+                            warnings.append(msg("score_more_strings"))
                         m.notes.append(raw)
                     if not grace:
                         cursor += dur

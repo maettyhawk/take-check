@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 import numpy as np
 
 from ..compare import OVERTONES, Issues, NoteResult, note_name
-from ..i18n import tr
+from ..i18n import msg
 from ..profile import Chords, PalmMute
 from .pitch_contour import BPO, PitchTracker
 
@@ -91,10 +91,7 @@ def evaluate(tracker: PitchTracker, results: list[NoteResult], issues: Issues, w
         return
     m_pos, m_neg = float(np.median(pos_a)), float(np.median(neg_a))
     if m_pos - m_neg < 3.0:
-        warnings.append(tr("Akkordtöne lassen sich in dieser Aufnahme spektral kaum von Nachbartönen unterscheiden – "
-                           "Akkordprüfung nur über die Transkription.",
-                           "Chord tones can hardly be told apart from neighbouring notes in this take – "
-                           "chord check uses the transcription only."))
+        warnings.append(msg("chord_check_unavailable"))
         return
 
     missing_by_key: Counter = Counter()
@@ -141,8 +138,7 @@ def evaluate(tracker: PitchTracker, results: list[NoteResult], issues: Issues, w
             if r.status == "ok" and r.weak and z < ABSENT_Z:
                 r.status, r.weak, r.det = "missing", False, None
                 issues.add("missing", r.expected_onset,
-                           tr(f"Fehlende Note: {note_name(n.pitch)} (Akkord mit {len(g)} Tönen, spektral kaum vorhanden)",
-                              f"Missing note: {note_name(n.pitch)} (chord of {len(g)} notes, barely present in the spectrum)"),
+                           msg("missing_note_spectral", note=note_name(n.pitch), n=len(g)),
                            0.45, n)
             if r.status == "missing":
                 if z >= PRESENT_Z:
@@ -166,48 +162,30 @@ def evaluate(tracker: PitchTracker, results: list[NoteResult], issues: Issues, w
 
     for string, count in pm_quiet.items():
         if count >= 10 and count >= 0.3 * pm_total[string]:
-            where_de = f"Saite {string}" if string else "oberen Saiten"
-            where_en = f"string {string}" if string else "upper strings"
+            where = msg("where_string", n=string) if string else msg("where_upper_strings")
             nbars, ranges = len(pm_quiet_bars[string]), bar_ranges(pm_quiet_bars[string])
-            issues.hints.append(tr(
-                f"Typisch für Palm Mute: Der obere Akkordton auf {where_de} klingt in {nbars} Takten "
-                f"kaum mit ({count} von {pm_total[string]} Noten) – der Handballen dämpft obere Saiten stärker bzw. "
-                f"das Plektrum erwischt sie beim Chug nicht. Takte: {ranges}. "
-                "Nur relevant, wenn der volle Akkord hörbar sein soll.",
-                f"Typical for palm muting: the upper chord tone on {where_en} barely sounds in {nbars} bars "
-                f"({count} of {pm_total[string]} notes) – the palm mutes upper strings more, or the pick misses them "
-                f"in chugs. Bars: {ranges}. Only relevant if the full chord should be audible."))
+            issues.hints.append(msg("pm_upper_typical", where=where, bars=nbars, count=count, total=pm_total[string], ranges=ranges))
 
     # Systematische Muster (ohne Palm Mute): als Warnung melden, Einzelmeldungen als „ausgelassen“ herabstufen
     for key, count in missing_by_key.items():
         string, pm = key
         if count < 10 or count < 0.5 * total_by_key[key]:
             continue
-        where = f"Saite {string}" if string else "derselben Lage"
-        label = " bei Palm-Mute-Akkorden" if pm else ""
-        label_en = " in palm-muted chords" if pm else ""
-        where_en = f"string {string}" if string else "the same position"
+        where = msg("where_string", n=string) if string else msg("where_same_position")
+        label = msg("label_pm_chords") if pm else ""
         pattern = f"string{string}-pm{int(pm)}"
         nbars, ranges = len(missing_bars[key]), bar_ranges(missing_bars[key])
-        warnings.append(tr(f"Auffällig: Akkordton auf {where}{label} klingt in {nbars} Takten "
-                           f"spektral sehr leise oder gar nicht ({count} von {total_by_key[key]} Noten; nicht sicher). "
-                           f"Takte: {ranges}. Einzelmeldungen sind herabgestuft – "
-                           "bitte reinhören, ob das gewollt ist.",
-                           f"Noticeable: the chord tone on {where_en}{label_en} is very quiet or absent in {nbars} bars "
-                           f"({count} of {total_by_key[key]} notes; uncertain). Bars: {ranges}. Individual findings "
-                           "are downgraded – please listen whether this is intended."))
+        warnings.append(msg("chord_tone_pattern", where=where, label=label, bars=nbars, count=count, total=total_by_key[key], ranges=ranges))
         for g in groups:
             for r in g:
                 if (r.note.string, r.note.palm_mute) == key and r.status in ("missing", "unchecked") \
                         and r.features.get("chord_z", 1) < ABSENT_Z and not r.features.get("masked"):
                     if r.status == "unchecked":
                         issues.add("chord_tone_omitted", r.expected_onset,
-                                   tr(f"Akkordton evtl. ausgelassen (systematisch): {note_name(r.note.pitch)}",
-                                      f"Chord tone possibly left out (systematic): {note_name(r.note.pitch)}"),
+                                   msg("chord_tone_omitted", note=note_name(r.note.pitch)),
                                    OMITTED_MAX_CONFIDENCE, r.note, pattern=pattern)
                     else:
                         issues.retype(r.note.id, "missing", "chord_tone_omitted", OMITTED_MAX_CONFIDENCE,
-                                      tr(f"Akkordton evtl. ausgelassen (systematisch): {note_name(r.note.pitch)}",
-                                         f"Chord tone possibly left out (systematic): {note_name(r.note.pitch)}"),
+                                      msg("chord_tone_omitted", note=note_name(r.note.pitch)),
                                       pattern=pattern)
                     r.status = "omitted"

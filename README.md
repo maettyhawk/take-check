@@ -56,6 +56,28 @@ uv run take-check analyze vorlage.musicxml take.wav --tuning "Drop D" --min-conf
 
 Die Sprache der Kommandozeile richtet sich nach `$LANG`, die der Oberfläche nach den Browser-Einstellungen.
 
+## Weitere Sprache hinzufügen
+
+Alle Texte – Oberfläche, Befunde, Warnungen, Kommandozeile – stehen in einer Datei pro Sprache unter
+`src/take_check/locales/` (`de.json`, `en.json`). Für eine neue Sprache:
+
+1. `en.json` kopieren, z. B. nach `fr.json`, und unter `meta` Code (`fr`), Name (`Français`) und
+   `date_locale` setzen.
+2. Die Texte unter `ui` (Oberfläche) und `msg` (Analyse) übersetzen. Platzhalter wie `{note}` bleiben
+   unverändert; Pluralformen sind Objekte nach Intl-Kategorien, z. B. `{"one": "{n} Befund", "other": "{n} Befunde"}`.
+3. Server neu starten – die Sprache erscheint automatisch im Sprachmenü und wird anhand der Browser-Sprache gewählt.
+
+Fehlende Einträge fallen auf Englisch zurück. `uv run pytest tests/test_i18n.py` prüft, ob eine Datei vollständig
+ist und dieselben Platzhalter verwendet. Analysen speichern Textschlüssel statt fertiger Sätze, daher erscheinen
+auch bestehende Analysen in der neuen Sprache.
+
+## Aufbau
+
+- `src/take_check/` – Analyse (Python): Vorlagen-Import (`score/`), Audio-Auswertung (`audio/`), Vergleich,
+  KI-Check, Web-API (`api.py`), Übersetzungen (`i18n.py`, `locales/`), Profile (`profile.py`, `profiles/`)
+- `web/` – Oberfläche als native ES-Module ohne Build-Schritt: `js/core/` (API, i18n, Formatierung),
+  `js/views/home.js`, `js/views/analysis/` (Pianoroll, Befundliste, Tooltips, Bedienung, KI-Check), `css/`
+
 ## Tests
 
 ```bash

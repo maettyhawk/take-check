@@ -11,7 +11,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 from .audio.transcribe import DetectedNote, Transcription
-from .i18n import T, as_text, tr
+from .i18n import Msg, MsgSeq, msg, render, to_json
 from .score.guitar import PINCH_INTERVALS
 from .score.model import Score, ScoreNote
 
@@ -68,9 +68,9 @@ class Issues:
         self.score = score
         self.offset = offset
         self.items: list[dict] = []
-        self.hints: list[T] = []  # neutrale Einordnungen („typisch für …“), keine Fehler
+        self.hints: list[Msg] = []  # neutrale Einordnungen („typisch für …“), keine Fehler
 
-    def add(self, type_: str, time: float, message: T | str, confidence: float, note: ScoreNote | None = None,
+    def add(self, type_: str, time: float, message: Msg | MsgSeq, confidence: float, note: ScoreNote | None = None,
             det: DetectedNote | None = None, **extra) -> None:
         bar, occ, beat = self.score.bar_at(time - self.offset)
         if note is not None:
@@ -79,7 +79,8 @@ class Issues:
             "id": len(self.items), "type": type_, "time": round(time, 4), "bar": bar, "occurrence": occ,
             "beat": beat, "note_id": None if note is None else note.id, "det_id": None if det is None else det.id,
             "pitch": None if note is None else note.pitch, "confidence": round(float(np.clip(confidence, 0, 1)), 2),
-            "message": str(message), "messages": as_text(message), **extra,
+            # Textschlüssel + Parameter (übersetzt wird beim Anzeigen); "message" = englischer Rückfall
+            "msg": to_json(message), "message": render(message, "en"), **extra,
         })
 
     def remove(self, note_id: int, types: set[str]) -> None:
@@ -96,11 +97,12 @@ class Issues:
                 i["confidence"] = round(i["confidence"] * factor, 2)
                 i.update(extra)
 
-    def retype(self, note_id: int, old_type: str, new_type: str, max_confidence: float, message: T | str, **extra) -> None:
+    def retype(self, note_id: int, old_type: str, new_type: str, max_confidence: float, message: Msg | MsgSeq,
+               **extra) -> None:
         for i in self.items:
             if i["note_id"] == note_id and i["type"] == old_type:
-                i.update(type=new_type, confidence=min(i["confidence"], max_confidence), message=str(message),
-                         messages=as_text(message), **extra)
+                i.update(type=new_type, confidence=min(i["confidence"], max_confidence), msg=to_json(message),
+                         message=render(message, "en"), **extra)
 
     def renumber(self) -> None:
         for k, i in enumerate(self.items):
@@ -243,30 +245,26 @@ def match_notes(score: Score, trans: Transcription, offset: float, opts: Options
             used.add(cand.id)
             r.det, r.status, r.played_pitch = cand, "wrong_pitch", cand.pitch
             if n.harmonic and cand.pitch == n.fretted_pitch:
-                label = (tr("Pinch-Harmonic nicht gelungen", "Pinch harmonic didn't sound") if n.harmonic == "pinch"
-                         else tr("Gegriffen statt Flageolett", "Fretted instead of harmonic"))
+                key = "harmonic_pinch_failed" if n.harmonic == "pinch" else "harmonic_fretted"
                 issues.add("harmonic_fretted", cand.onset,
-                           label + tr(f": {note_name(cand.pitch)} statt {note_name(n.pitch)} (Flageolett)",
-                                      f": {note_name(cand.pitch)} instead of {note_name(n.pitch)} (harmonic)"),
+                           msg(key, played=note_name(cand.pitch), expected=note_name(n.pitch)),
                            0.55 if n.harmonic == "pinch" else 0.8, n, cand, played_pitch=cand.pitch)
                 continue
             hint = ""
             if cand.pitch - n.pitch in PINCH_INTERVALS:
-                hint = tr(" – evtl. ungewolltes Flageolett/Pinch", " – possibly an unintended harmonic/pinch")
+                hint = msg("suffix_maybe_harmonic")
             elif abs(cand.pitch - n.pitch) == 12:
-                hint = tr(" – Oktave daneben (kann auch ein Erkennungsfehler sein)",
-                          " – off by an octave (may also be a detection error)")
+                hint = msg("suffix_octave")
             conf = 0.5 + 0.4 * min(cand.amplitude / 0.5, 1.0)
             if abs(cand.pitch - n.pitch) == 12:
                 conf *= 0.6
             issues.add("wrong_pitch", cand.onset,
-                       tr(f"Falscher Ton: {note_name(cand.pitch)} statt {note_name(n.pitch)}",
-                          f"Wrong note: {note_name(cand.pitch)} instead of {note_name(n.pitch)}") + hint,
+                       msg("wrong_note", played=note_name(cand.pitch), expected=note_name(n.pitch)) + hint,
                        conf, n, cand, played_pitch=cand.pitch)
         else:
             conf = (1 - r.evidence / opts.evidence_threshold) * (0.75 if chord[n.id] >= 3 else 1.0)
-            issues.add("missing", t, tr(f"Fehlende Note: {note_name(n.pitch)}", f"Missing note: {note_name(n.pitch)}")
-                       + (tr(f" (Akkord mit {chord[n.id]} Tönen)", f" (chord of {chord[n.id]} notes)")
+            issues.add("missing", t, msg("missing_note", note=note_name(n.pitch))
+                       + (msg("suffix_chord_size", n=chord[n.id])
                           if chord[n.id] > 1 else ""),
                        max(conf, 0.3), n)
 
@@ -375,18 +373,17 @@ def timing_issues(results: list[NoteResult], opts: Options, issues: Issues, prof
             continue
         kind = "late" if dev > 0 else "early"
         conf = 0.9 if abs(dev) > 2 * tol else 0.6
-        ms = f"{abs(dev) * 1000:.0f} ms"
-        context = tr(f", Groove hier {groove * 1000:+.0f} ms", f", groove here {groove * 1000:+.0f} ms") \
-            if abs(groove) >= 0.008 else ""
+        ms = f"{abs(dev) * 1000:.0f}"
+        context = msg("groove_context", ms=f"{groove * 1000:+.0f}") if abs(groove) >= 0.008 else ""
         if len(g) > 1:
             names = "·".join(note_name(r.note.pitch) for r in sorted(g, key=lambda r: r.note.pitch))
             arrow = {"down": ", ↓", "up": ", ↑"}.get((lead.strum or {}).get("dir"), "") if profile.strum.show_direction else ""
-            head = tr("Akkord zu spät", "Chord late") if dev > 0 else tr("Akkord zu früh", "Chord early")
-            msg = head + f": {ms} ({names}{arrow}" + context + ")"
+            text = msg("timing_chord_late" if dev > 0 else "timing_chord_early", ms=ms, notes=names, arrow=arrow,
+                       context=context)
         else:
-            head = tr("Zu spät", "Late") if dev > 0 else tr("Zu früh", "Early")
-            msg = head + f": {ms} ({note_name(lead.note.pitch)}" + context + ")"
-        issues.add(kind, lead.onset, msg, conf, lead.note, lead.det, delta_ms=round(dev * 1000, 1),
+            text = msg("timing_late" if dev > 0 else "timing_early", ms=ms, note=note_name(lead.note.pitch),
+                       context=context)
+        issues.add(kind, lead.onset, text, conf, lead.note, lead.det, delta_ms=round(dev * 1000, 1),
                    groove_ms=round(groove * 1000, 1), chord=len(g) > 1)
 
     _groove_hints(events, issues, tp)
@@ -398,8 +395,7 @@ def timing_issues(results: list[NoteResult], opts: Options, issues: Issues, prof
         if (not n.palm_mute and not n.dead and not n.bend and n.duration >= 0.25
                 and r.det.duration < 0.4 * n.duration and r.det.duration < 0.2):
             issues.add("short", r.det.onset,
-                       tr(f"Zu kurz: {r.det.duration * 1000:.0f} ms statt {n.duration * 1000:.0f} ms ({note_name(n.pitch)})",
-                          f"Too short: {r.det.duration * 1000:.0f} ms instead of {n.duration * 1000:.0f} ms ({note_name(n.pitch)})"),
+                       msg("too_short", played=f"{r.det.duration * 1000:.0f}", expected=f"{n.duration * 1000:.0f}", note=note_name(n.pitch)),
                        0.4, n, r.det)
 
 
@@ -436,11 +432,8 @@ def _groove_hints(events: list, issues: Issues, tp) -> None:
         b0 = bars[first * tp.section_bars]
         b1 = bars[min((last + 1) * tp.section_bars, len(bars)) - 1]
         avg = float(np.mean(meds)) * 1000
-        where = tr("vor", "ahead of") if sign < 0 else tr("hinter", "behind")
-        issues.hints.append(tr(f"T. {b0.number}–{b1.number}: spielt gleichmäßig etwa {abs(avg):.0f} ms ",
-                               f"Bars {b0.number}–{b1.number}: plays consistently about {abs(avg):.0f} ms ") + where
-                            + tr(" dem Klick (Stilfrage, kein Fehler – Timing wird gegen diesen Groove bewertet).",
-                                 " the click (a matter of style, not an error – timing is judged against this groove)."))
+        issues.hints.append(msg("groove_section_ahead" if sign < 0 else "groove_section_behind",
+                                **{"from": b0.number, "to": b1.number, "ms": f"{abs(avg):.0f}"}))
 
 
 
@@ -473,14 +466,13 @@ def _extra_notes(results: list[NoteResult], index: _TimeIndex, taken: set[int], 
                                      and d.onset < r.expected_onset <= d.end + 0.15 for r in by_onset[lo:hi + 8]):
             continue
         conf = float(np.clip((d.amplitude - 0.15) / 0.35, 0.2, 0.95))
-        message = tr(f"Zusätzliche Note: {note_name(d.pitch)}", f"Extra note: {note_name(d.pitch)}")
+        message = msg("extra_note", note=note_name(d.pitch))
         if d.duration < 0.13:
             struck = [r for r in sounding if r.det is not None and abs(r.onset - d.onset) < 0.02 and r.det.pitch != d.pitch]
             if struck:
                 conf *= 0.6
                 other = note_name(struck[0].note.pitch)
-                message += tr(f" (kurz, beim Anschlag von {other} – evtl. Saitengeräusch)",
-                              f" (short, while picking {other} – possibly string noise)")
+                message += msg("extra_short_suffix", other=other)
         if has_attack is not None and not has_attack(d.onset):
             # ohne Anschlag im Oktavabstand zu einem klingenden Ton: Erkennungsartefakt
             if any(abs(d.pitch - p) == 12 for p in [r.note.pitch for r in sounding] + played):
@@ -489,5 +481,5 @@ def _extra_notes(results: list[NoteResult], index: _TimeIndex, taken: set[int], 
             if any(abs(d.pitch - r.det.pitch) <= 2 for r in sounding if r.det is not None):
                 continue
             conf *= 0.4
-            message += tr(" ohne Anschlag (mitklingende Saite?)", " without attack (sympathetic string?)")
+            message += msg("extra_no_attack_suffix")
         issues.add("extra", d.onset, message, conf, None, d, played_pitch=d.pitch)

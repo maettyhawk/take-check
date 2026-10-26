@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from take_check.i18n import render
 from take_check.score import load_score
 from take_check.score.musicxml import _expand, _Measure
 
@@ -97,7 +98,7 @@ def test_without_tuning_uses_written_pitch(tmp_path):
     p.write_text(stripped)
     s = load_score(p)
     assert s.tuning is None
-    assert any("Keine Stimmung" in str(w) for w in s.warnings)
+    assert any("Keine Stimmung" in render(w, "de") for w in s.warnings)
     assert by_time(s, 0.0)[0].pitch == 40
     assert by_time(s, 7.0)[0].pitch == 83  # Flageolett aus notierter Tonhöhe − Bund berechnet
 

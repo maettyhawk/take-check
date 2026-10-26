@@ -14,12 +14,12 @@ from .audio import articulation, chord_check, harmonics, pitch_contour, stops, s
 from .audio.align import estimate_offset
 from .audio.transcribe import Transcription, transcribe
 from .compare import Issues, NoteResult, Options, match_notes, timing_issues
-from .i18n import as_text, tr
+from .i18n import msg, to_json
 from .profile import Profile, load_profile
 from .score import Score, load_score
 
 SR = 22050
-RESULT_VERSION = 2  # erhöhen, wenn neue Prüfungen/Felder dazukommen – ältere Analysen werden als veraltet markiert
+RESULT_VERSION = 3  # erhöhen, wenn neue Prüfungen/Felder dazukommen – ältere Analysen werden als veraltet markiert
 # Transkription immer im vollen Bereich (bis 9-Saiter/Flageoletts), damit der Cache bei geänderter
 # Stimmung gültig bleibt; gefiltert wird danach auf den Bereich der Vorlage.
 TRANSCRIBE_RANGE = (24, 108)
@@ -83,13 +83,13 @@ def analyze(score_path: str | Path, audio_path: str | Path, opts: Options | None
         opts = Options(timing_tol=profile.timing.tolerance_ms / 1000)
     opts.bend_tol_cents = profile.bends.tolerance_cents
     t_start = time.time()
-    progress("Vorlage einlesen", 0.02)
+    progress("read_score", 0.02)
     score = load_score(score_path, tuning)
     warnings = list(score.warnings)
     if not score.notes:
         raise ValueError("Die Vorlage enthält keine Noten.")
 
-    progress("Audio laden", 0.05)
+    progress("load_audio", 0.05)
     y = load_audio(audio_path)
     lo, hi = pitch_range(score)
 
@@ -97,23 +97,20 @@ def analyze(score_path: str | Path, audio_path: str | Path, opts: Options | None
     if cache is not None and cache.exists():
         trans = Transcription.load(cache)
     else:
-        progress("Noten erkennen (Basic Pitch)", 0.1)
+        progress("transcribe", 0.1)
         trans = transcribe(audio_path, min_pitch=TRANSCRIBE_RANGE[0], max_pitch=TRANSCRIBE_RANGE[1])
         if cache is not None:
             trans.save(cache)
     trans.notes = [d for d in trans.notes if lo <= d.pitch <= hi]
 
-    progress("Ausrichtung", 0.45)
+    progress("align", 0.45)
     manual_offset = offset is not None
     if offset is None:
         offset, quality = estimate_offset(score.notes, trans.notes)
         if quality < 0.3:
-            warnings.append(tr(f"Ausrichtung unsicher: nur {quality:.0%} der Noten passen. "
-                               "Bitte Versatz prüfen oder manuell einstellen.",
-                               f"Alignment uncertain: only {quality:.0%} of the notes match. "
-                               "Please check the offset or set it manually."))
+            warnings.append(msg("alignment_uncertain", percent=f"{quality:.0%}"))
 
-    progress("Vergleich", 0.5)
+    progress("compare", 0.5)
     refine = lambda t: articulation.refine_onset(y, SR, t)  # noqa: E731
     has_attack = lambda t: articulation.has_attack(y, SR, t)  # noqa: E731
     issues = Issues(score, offset)
@@ -131,7 +128,7 @@ def analyze(score_path: str | Path, audio_path: str | Path, opts: Options | None
     strum.evaluate(results, trans, issues, profile.strum)
     timing_issues(results, opts, issues, profile)
 
-    progress("Artikulation", 0.6)
+    progress("articulation", 0.6)
     windows = _note_windows(score)
     for r in results:
         if r.status == "ok" and r.det is not None and not r.weak and not r.note.dead:
@@ -139,26 +136,25 @@ def analyze(score_path: str | Path, audio_path: str | Path, opts: Options | None
             r.features.update(articulation.decay_features(y, SR, r.onset, windows[r.note.id], r.note.pitch))
     articulation.evaluate(results, issues, warnings, profile.palm_mute)
 
-    progress("Tonhöhenverlauf (Bends, Stimmung)", 0.7)
+    progress("pitch", 0.7)
     tracker = pitch_contour.PitchTracker(y, SR, lo)
     tuning_cents = pitch_contour.estimate_tuning(tracker, results)
     if tuning_cents is not None and abs(tuning_cents) >= 15:
-        warnings.append(tr(f"Gitarre ca. {tuning_cents:+.0f} Cent {'zu hoch' if tuning_cents > 0 else 'zu tief'} gestimmt.",
-                           f"Guitar tuned about {tuning_cents:+.0f} cents {'sharp' if tuning_cents > 0 else 'flat'}."))
+        warnings.append(msg("tuning_sharp" if tuning_cents > 0 else "tuning_flat", cents=f"{tuning_cents:+.0f}"))
     pitch_contour.evaluate_bends(tracker, results, issues, tuning_cents or 0.0, opts.bend_tol_cents)
     pitch_contour.evaluate_unwanted(tracker, results, issues, tuning_cents or 0.0)
 
-    progress("Akkordtöne", 0.8)
+    progress("chords", 0.8)
     chord_check.evaluate(tracker, results, issues, warnings, profile.chords, profile.palm_mute)
 
-    progress("Pausen und Stops", 0.9)
+    progress("stops", 0.85)
     stops.evaluate(y, SR, tracker, score.notes, results, offset, issues, warnings, profile.stops)
     issues.renumber()
 
-    progress("Flageoletts", 0.85)
+    progress("harmonics", 0.9)
     harmonics.evaluate(tracker, results, issues)
 
-    progress("Ergebnis", 0.95)
+    progress("result", 0.95)
     result = build_result(score, trans, results, issues, offset, tuning_cents, len(y) / SR, warnings, opts)
     result["profile"] = {"id": profile.id, "name": profile.name}
     result["version"] = RESULT_VERSION
@@ -206,8 +202,8 @@ def build_result(score: Score, trans: Transcription, results: list[NoteResult], 
     return {
         "title": score.title, "offset": offset, "duration": round(duration, 3),
         "tuning": score.tuning, "tuning_cents": tuning_cents,
-        "options": asdict(opts), "warnings": [as_text(w) for w in warnings],
-        "hints": [as_text(h) for h in issues.hints],
+        "options": asdict(opts), "warnings": [to_json(w) for w in warnings],
+        "hints": [to_json(h) for h in issues.hints],
         "summary": {
             "notes_total": len(results), "notes_checked": len(checked),
             "notes_ok": sum(1 for r in checked if r.status == "ok" and not issue_by_note.get(r.note.id)),
