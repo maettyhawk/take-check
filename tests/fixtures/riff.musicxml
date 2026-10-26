@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
+  <work><work-title>Testriff</work-title></work>
+  <part-list><score-part id="P1"><part-name>E-Gitarre</part-name></score-part></part-list>
+  <part id="P1">
+    <!-- Takt 1: Wiederholungsbeginn, PM-Achtel, Akkord, übergebundenes G3 -->
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>TAB</sign><line>5</line></clef>
+        <staff-details>
+          <staff-lines>6</staff-lines>
+          <staff-tuning line="1"><tuning-step>E</tuning-step><tuning-octave>2</tuning-octave></staff-tuning>
+          <staff-tuning line="2"><tuning-step>A</tuning-step><tuning-octave>2</tuning-octave></staff-tuning>
+          <staff-tuning line="3"><tuning-step>D</tuning-step><tuning-octave>3</tuning-octave></staff-tuning>
+          <staff-tuning line="4"><tuning-step>G</tuning-step><tuning-octave>3</tuning-octave></staff-tuning>
+          <staff-tuning line="5"><tuning-step>B</tuning-step><tuning-octave>3</tuning-octave></staff-tuning>
+          <staff-tuning line="6"><tuning-step>E</tuning-step><tuning-octave>4</tuning-octave></staff-tuning>
+        </staff-details>
+      </attributes>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <direction placement="above">
+        <direction-type><words>P.M.</words></direction-type>
+        <direction-type><dashes type="start" number="1"/></direction-type>
+        <sound tempo="120"/>
+      </direction>
+      <note><pitch><step>E</step><octave>2</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type>
+        <notations><technical><string>6</string><fret>0</fret></technical></notations></note>
+      <note><pitch><step>E</step><octave>2</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type>
+        <notations><technical><string>6</string><fret>0</fret></technical></notations></note>
+      <note><pitch><step>E</step><octave>2</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type>
+        <notations><technical><string>6</string><fret>0</fret></technical></notations></note>
+      <direction><direction-type><dashes type="stop" number="1"/></direction-type></direction>
+      <note><pitch><step>E</step><octave>2</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type>
+        <notations><technical><string>6</string><fret>0</fret></technical></notations></note>
+      <note><pitch><step>E</step><octave>3</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type>
+        <notations><technical><string>4</string><fret>2</fret></technical></notations></note>
+      <note><chord/><pitch><step>B</step><octave>3</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type>
+        <notations><technical><string>3</string><fret>4</fret></technical></notations></note>
+      <note><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><tie type="start"/><voice>1</voice><type>quarter</type>
+        <notations><tied type="start"/><technical><string>3</string><fret>0</fret></technical></notations></note>
+    </measure>
+    <!-- Takt 2: 1. Volta, Haltebogen-Ende, Hammer-on, Wiederholung -->
+    <measure number="2">
+      <barline location="left"><ending number="1" type="start"/></barline>
+      <note><pitch><step>G</step><octave>3</octave></pitch><duration>4</duration><tie type="stop"/><voice>1</voice><type>quarter</type>
+        <notations><tied type="stop"/><technical><string>3</string><fret>0</fret></technical></notations></note>
+      <note><pitch><step>A</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type>
+        <notations><technical><hammer-on type="start" number="1">H</hammer-on><string>3</string><fret>2</fret></technical></notations></note>
+      <note><pitch><step>B</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>eighth</type>
+        <notations><technical><hammer-on type="stop" number="1"/><string>3</string><fret>4</fret></technical></notations></note>
+      <note><rest/><duration>8</duration><voice>1</voice><type>half</type></note>
+      <barline location="right"><ending number="1" type="stop"/><repeat direction="backward"/></barline>
+    </measure>
+    <!-- Takt 3: 2. Volta, Bend + Release, Flageolett 7. Bund, Vorschlag, Dead Note -->
+    <measure number="3">
+      <barline location="left"><ending number="2" type="start"/></barline>
+      <note><pitch><step>F</step><alter>1</alter><octave>4</octave></pitch><duration>8</duration><voice>1</voice><type>half</type>
+        <notations><technical>
+          <bend><bend-alter>2</bend-alter></bend>
+          <bend><bend-alter>-2</bend-alter><release/></bend>
+          <string>2</string><fret>7</fret></technical></notations></note>
+      <note><pitch><step>B</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type>
+        <notehead>diamond</notehead>
+        <notations><technical><harmonic><natural/></harmonic><string>1</string><fret>7</fret></technical></notations></note>
+      <note><grace/><pitch><step>G</step><octave>3</octave></pitch><voice>1</voice><type>eighth</type>
+        <notations><technical><string>3</string><fret>0</fret></technical></notations></note>
+      <note><pitch><step>A</step><octave>2</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type>
+        <notehead>x</notehead>
+        <notations><technical><string>5</string><fret>0</fret></technical></notations></note>
+      <barline location="right"><ending number="2" type="discontinue"/></barline>
+    </measure>
+  </part>
+</score-partwise>

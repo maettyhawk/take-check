@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Analysedaten der Web-App
+analyses/
+# Eigene Beispieldateien (nicht ins Repository)
+data/
+
+# macOS
+.DS_Store

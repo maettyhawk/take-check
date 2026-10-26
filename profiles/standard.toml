@@ -1,0 +1,46 @@
+# Take-Check-Profil: Spielpraxis-Regeln und Schwellen für die Auswertung.
+# Weitere Profile als eigene .toml-Datei in diesem Ordner anlegen – fehlende Werte erben von „standard“.
+
+name = "Standard"
+description = "Rock-/Metal-Gitarre, DI-Spur, mit Plektrum angeschlagen"
+
+[timing]
+tolerance_ms = 30            # Abweichung vom eigenen Groove, ab der ein Anschlag gemeldet wird
+groove_window_bars = 1.0     # lokaler Groove: Median der Anschläge in ±1 Takt
+groove_min_points = 5        # weniger Anschläge in der Umgebung → Groove = Gesamtmedian
+section_bars = 4             # Abschnittslänge für Hinweise zu Vorlage/Verzögerung
+section_push_hint_ms = 12    # gleichmäßig vor/hinter dem Klick ab hier als Hinweis (Stilfrage, kein Fehler)
+
+[strum]
+# Die Anschlagsrichtung (Up-/Downstroke) ist nur bei etwa einem Drittel der Akkorde sicher bestimmbar.
+# Sie wird deshalb nur intern genutzt: Akkord-Timing zählt ab der ersten angeschlagenen Saite.
+show_direction = false       # Richtung in Oberfläche und Meldungen anzeigen
+report_slow = false          # „verschleppter Anschlag“ melden
+min_spread_ms = 8            # darunter ist die Anschlagsrichtung nicht bestimmbar
+slow_ms = 50                 # erster bis letzter Saite: ab hier „verschleppt“
+
+[palm_mute]
+root_only = true             # Handballen liegt auf den tiefen Saiten: nur den tiefsten Ton prüfen
+upper_tones_optional = true  # obere Akkordtöne bei Palm Mute dürfen leise sein oder fehlen
+local_window_s = 8.0         # Dämpfungsstärke schwankt: Vergleich mit gedämpften Noten der Umgebung
+outlier_margin = 0.5         # so viel „offener“ als die Umgebung muss ein Ton sein (0 = gedämpft, 1 = offen)
+lift_points = true           # Taktanfang, Pause, Laufbeginn, Griffwechsel: Handballen oft kurz angehoben
+lift_confidence_factor = 0.5
+
+[chords]
+low_pitch = 52               # unter E3 sind Einzeltöne zu träge im Spektrum, um sie sicher zu isolieren
+uncertain_missing_cap = 0.45 # höchste Sicherheit für fehlende Akkordtöne
+
+[stops]
+enabled = true               # Pausen/Stops müssen sauber abgedämpft sein
+min_rest_ms = 120            # kürzere Lücken werden nicht geprüft
+release_ms = 60              # Ausklingzeit nach dem Notenende, bevor gemessen wird
+anticipation_ms = 40         # vor dem nächsten Anschlag nicht mehr messen (Plektrum, Griffwechsel)
+max_level_db = -35           # Pegel in der Pause relativ zum Spielpegel, ab dem es „klingt“
+outlier_mad = 2.0            # zusätzlich: deutlich lauter als die übrigen Pausen des Takes
+min_above_floor_db = 10      # Abstand zum Grundrauschen (Brummen/Rauschen zählt nicht)
+natural_decay_after_s = 1.0  # nach so lang gehaltenen Tönen ist Ausklingen in die Pause oft Phrasierung
+natural_decay_factor = 0.5   # Sicherheit dann entsprechend gedämpft
+
+[bends]
+tolerance_cents = 30
