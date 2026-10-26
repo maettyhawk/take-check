@@ -3,7 +3,7 @@
 import { api } from "../core/api.js";
 import { esc, qs, qsa } from "../core/dom.js";
 import { noteName } from "../core/format.js";
-import { dateLocale, stageText, t } from "../core/i18n.js";
+import { dateLocale, languages, stageText, t } from "../core/i18n.js";
 import { store } from "../core/store.js";
 
 const SCORE_ACCEPT = ".gp,.musicxml,.xml,.mxl,.mid,.midi";
@@ -84,6 +84,29 @@ function bindUpload(preset, profileSel) {
   });
 }
 
+const TIERS = [["high", "tierHigh"], ["medium", "tierMedium"], ["low", "tierLow"]];
+
+/** Befunde nach Sicherheit: rot = sicher, gelb = wahrscheinlich, grau = unsicher. */
+function tierBadges(item) {
+  const tiers = item.issue_tiers;
+  if (!tiers) return "";
+  if (!tiers.high && !tiers.medium && !tiers.low) return `<span class="tiers"><span class="tier none">✓ ${t("tierNone")}</span></span>`;
+  return `<span class="tiers">${TIERS.map(([key, label]) => `<span class="tier ${key}${tiers[key] ? "" : " zero"}"
+    title="${esc(t(label, { n: tiers[key] }))}">${tiers[key]}</span>`).join("")}</span>`;
+}
+
+/** Abzeichen, wenn ein KI-Check vorliegt (grau, wenn die Analyse danach neu berechnet wurde) oder gerade läuft. */
+function aiBadge(item) {
+  const checks = item.ai_checks || [];
+  if (checks.some((c) => c.running)) return `<span class="ai-badge running">✦ ${t("aiBadgeRunning")}</span>`;
+  const done = checks.filter((c) => c.done);
+  if (!done.length) return "";
+  const names = (list) => list.map((c) => languages().find((l) => l.code === c.lang)?.name || c.lang).join(", ");
+  const current = done.filter((c) => !c.stale);
+  const title = current.length ? t("aiBadgeTitle", { langs: names(current) }) : t("aiBadgeStale", { langs: names(done) });
+  return `<span class="ai-badge${current.length ? "" : " stale"}" title="${esc(title)}">✦ ${t("aiBadge")}</span>`;
+}
+
 function renderList(items, rerender) {
   const list = qs("#list");
   if (!list) return;
@@ -98,8 +121,10 @@ function renderList(items, rerender) {
   list.innerHTML = `<table class="list"><thead><tr><th>${t("date")}</th><th>${t("scoreAudio")}</th><th>${t("status")}</th><th></th></tr></thead><tbody>
     ${items.map((i) => `<tr>
       <td class="mono">${new Date(i.created * 1000).toLocaleString(dateLocale(), { dateStyle: "short", timeStyle: "short" })}</td>
-      <td><a href="#/a/${i.id}">${esc(i.title || i.score_name)}</a><br><span class="muted">${esc(i.audio_name)}</span></td>
-      <td><span class="status"><span class="dot ${i.status}"></span>${esc(statusText(i))}</span></td>
+      <td><a href="#/a/${i.id}">${esc(i.title || i.score_name)}</a> ${aiBadge(i)}<br><span class="muted">${esc(i.audio_name)}</span></td>
+      <td>${i.status === "done" && i.issue_tiers
+        ? `${tierBadges(i)}<div class="muted small">${esc(statusText(i))}</div>`
+        : `<span class="status"><span class="dot ${i.status}"></span>${esc(statusText(i))}</span>`}</td>
       <td style="text-align:right"><button class="btn small" data-del="${i.id}" ${busy(i) ? "disabled" : ""}>${t("delete")}</button></td>
     </tr>`).join("")}</tbody></table>`;
   qsa("[data-del]", list).forEach((b) => b.addEventListener("click", async () => {

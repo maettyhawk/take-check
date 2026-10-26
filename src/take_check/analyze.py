@@ -19,6 +19,18 @@ from .profile import Profile, load_profile
 from .score import Score, load_score
 
 SR = 22050
+# Sicherheitsstufen für die Übersicht: sicher / wahrscheinlich (Standardansicht ab 0,5) / unsicher
+TIER_HIGH, TIER_MEDIUM = 0.7, 0.5
+
+
+def issue_tiers(issues: list[dict]) -> dict[str, int]:
+    tiers = {"high": 0, "medium": 0, "low": 0}
+    for i in issues:
+        c = i["confidence"]
+        tiers["high" if c >= TIER_HIGH else "medium" if c >= TIER_MEDIUM else "low"] += 1
+    return tiers
+
+
 RESULT_VERSION = 3  # erhöhen, wenn neue Prüfungen/Felder dazukommen – ältere Analysen werden als veraltet markiert
 # Transkription immer im vollen Bereich (bis 9-Saiter/Flageoletts), damit der Cache bei geänderter
 # Stimmung gültig bleibt; gefiltert wird danach auf den Bereich der Vorlage.
@@ -208,6 +220,7 @@ def build_result(score: Score, trans: Transcription, results: list[NoteResult], 
             "notes_total": len(results), "notes_checked": len(checked),
             "notes_ok": sum(1 for r in checked if r.status == "ok" and not issue_by_note.get(r.note.id)),
             "issue_counts": dict(counts),
+            "issue_tiers": issue_tiers(issues.items),
         },
         "bars": bars, "notes": notes, "detected": detected, "issues": issues.items,
     }

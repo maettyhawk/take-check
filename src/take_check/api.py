@@ -85,7 +85,7 @@ def _run(d: Path) -> None:
         s = result["summary"]
         _write_meta(d, status="done", stage="done", progress=1.0, title=result["title"], result_version=RESULT_VERSION,
                     offset=result["offset"], notes_checked=s["notes_checked"], notes_ok=s["notes_ok"],
-                    issue_count=len(result["issues"]), finished=time.time())
+                    issue_count=len(result["issues"]), issue_tiers=s["issue_tiers"], finished=time.time())
     except Exception as exc:  # Fehler für die Oberfläche festhalten
         _write_meta(d, status="error", stage="error", error=str(exc), traceback=traceback.format_exc())
 
@@ -169,15 +169,33 @@ def profiles() -> list[dict]:
     return list_profiles()
 
 
+def _ai_checks(d: Path, meta: dict) -> list[dict]:
+    """Vorhandene bzw. laufende KI-Checks je Sprache; veraltet, wenn die Analyse danach neu berechnet wurde."""
+    checks = []
+    for code in sorted({p.stem.removeprefix("ai_check_") for p in d.glob("ai_check_*.json")}
+                       | {k.removeprefix("ai_status_") for k, v in meta.items() if k.startswith("ai_status_") and v == "running"}):
+        path = d / f"ai_check_{code}.json"
+        running = meta.get(f"ai_status_{code}") == "running"
+        stale = path.exists() and path.stat().st_mtime < meta.get("finished", 0)
+        checks.append({"lang": code, "running": running, "done": path.exists(), "stale": stale})
+    return checks
+
+
 @app.get("/api/analyses")
 def list_analyses() -> list[dict]:
     if not DATA.exists():
         return []
+    from .analyze import issue_tiers
     metas = []
     for d in DATA.iterdir():
         if ID_RE.match(d.name) and (d / "meta.json").exists():
             m = _read_meta(d)
+            if m.get("status") == "done" and "issue_tiers" not in m and (d / "result.json").exists():
+                # ältere Analysen: Sicherheitsstufen einmalig aus dem Ergebnis nachtragen
+                tiers = issue_tiers(json.loads((d / "result.json").read_text())["issues"])
+                m = _write_meta(d, issue_tiers=tiers)
             m.pop("traceback", None)
+            m["ai_checks"] = _ai_checks(d, m)
             metas.append(m)
     return sorted(metas, key=lambda m: m.get("created", 0), reverse=True)
 

@@ -16,7 +16,6 @@ export function analysisTemplate(view) {
       <div class="summary-head">
         <h1>${esc(result.title)}</h1>
         <span class="muted">${esc(meta.score_name)} · ${esc(meta.audio_name)}${result.profile ? ` · ${t("profile")}: ${esc(result.profile.name)}` : ""}</span>
-        <a href="#/">${t("allAnalyses")}</a>
       </div>
       <div class="stats" id="stats"></div>
       ${warnings.length ? `<ul class="warnings">${warnings.map((w) => `<li>${esc(renderMsg(w))}</li>`).join("")}</ul>` : ""}

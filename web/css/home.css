@@ -22,3 +22,22 @@ table.list tr:last-child td { border-bottom: 0; }
 .dot.done { background: var(--c-harm); }
 .dot.error { background: var(--c-notes); }
 .dot.running, .dot.queued { background: var(--c-timing); }
+.tiers { display: inline-flex; gap: 6px; }
+.tier {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 44px; padding: 1px 9px 1px 7px; border-radius: 999px;
+  font-weight: 600; font-variant-numeric: tabular-nums; border: 1px solid var(--border); background: var(--bg); cursor: help;
+}
+.tier::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.tier.high { color: var(--c-notes); }
+.tier.medium { color: var(--c-timing); }
+.tier.low { color: var(--muted); }
+.tier.zero { opacity: .4; }
+.tier.none { color: var(--c-harm); font-weight: 500; cursor: default; }
+.tier.none::before { display: none; }
+table.list .small { font-size: 12px; margin-top: 3px; }
+.ai-badge {
+  display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  color: var(--accent); border: 1px solid currentColor; vertical-align: 1px; cursor: help;
+}
+.ai-badge.stale { color: var(--muted); }
+.ai-badge.running { color: var(--c-timing); cursor: default; }

@@ -4,8 +4,14 @@ import { esc, qs } from "../core/dom.js";
 import { getLang, languages, setLang, t } from "../core/i18n.js";
 import { applyTheme, savedTheme, setTheme } from "../core/theme.js";
 
+const BACK_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M10 3 5 8l5 5"
+  fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 export function setupHeader() {
   qs(".tagline").textContent = t("tagline");
+  const back = qs("#back-link");
+  back.innerHTML = `${BACK_ICON}<span>${t("allAnalyses")}</span>`;
+  back.title = t("toOverview");
   const theme = savedTheme();
   applyTheme(theme);
   qs("#controls").innerHTML = `
@@ -18,4 +24,10 @@ export function setupHeader() {
   qs("#theme-select").value = theme;
   qs("#lang-select").addEventListener("change", (ev) => { setLang(ev.target.value); location.reload(); });
   qs("#theme-select").addEventListener("change", (ev) => setTheme(ev.target.value));
+}
+
+/** Zurück-Link nur außerhalb der Übersicht zeigen; dort ersetzt er den Untertitel. */
+export function setBackLink(visible) {
+  qs("#back-link").hidden = !visible;
+  qs(".tagline").hidden = visible;
 }

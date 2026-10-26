@@ -2,7 +2,7 @@
 
 import { qs } from "./core/dom.js";
 import { initI18n } from "./core/i18n.js";
-import { setupHeader } from "./ui/header.js";
+import { setBackLink, setupHeader } from "./ui/header.js";
 import { showAnalysis } from "./views/analysis/index.js";
 import { showHome } from "./views/home.js";
 
@@ -13,6 +13,7 @@ function route() {
   cleanup();
   qs("#tooltip").hidden = true;
   const match = location.hash.match(/^#\/a\/([\w-]+)/);
+  setBackLink(Boolean(match));
   cleanup = (match ? showAnalysis(app, match[1]) : showHome(app)) || (() => {});
 }
 
