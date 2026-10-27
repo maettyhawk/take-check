@@ -31,6 +31,23 @@ TAKE_CHECK_API_KEY_FILE=~/.secrets/anthropic_api_key uv run take-check serve
 uv run take-check ai-check ergebnis.json            # für ein gespeichertes Ergebnis aus 'analyze -o'
 ```
 
+## Bericht für den Musiker
+
+In der Befundliste legen Kästchen fest, welche Stellen in den Bericht kommen. Vorbelegt sind die Stellen aus
+„Zuerst anhören“ des KI-Checks, ohne KI-Check alle sicheren Befunde. „Bericht“ öffnet eine Vorschau mit einem
+Feedbacktext (vorbelegt aus dem KI-Check) und je Stelle einem Ausschnitt aus Noten und Tabulatur. Der Ausschnitt
+wird mit [alphaTab](https://alphatab.net) direkt aus der Vorlage gerendert, also mit den Saiten und Bünden aus
+dem Guitar-Pro-File. Betroffene Noten sind farbig, Nummern verweisen auf die Liste darunter. Bei MIDI-Vorlagen
+erscheint stattdessen ein Pianoroll-Ausschnitt.
+
+„PDF herunterladen“ erzeugt das PDF auf dem Server mit Headless-Chromium. Das muss einmalig eingerichtet werden:
+
+```bash
+uv sync --extra pdf && uv run playwright install chromium
+```
+
+Ohne diese Einrichtung funktioniert „Drucken“ trotzdem: Druckdialog des Browsers, dort „Als PDF speichern“.
+
 ## Installation
 
 Voraussetzungen: Python 3.12, [uv](https://docs.astral.sh/uv/), `ffmpeg` und `libsndfile`.
@@ -76,7 +93,8 @@ auch bestehende Analysen in der neuen Sprache.
 - `src/take_check/` – Analyse (Python): Vorlagen-Import (`score/`), Audio-Auswertung (`audio/`), Vergleich,
   KI-Check, Web-API (`api.py`), Übersetzungen (`i18n.py`, `locales/`), Profile (`profile.py`, `profiles/`)
 - `web/` – Oberfläche als native ES-Module ohne Build-Schritt: `js/core/` (API, i18n, Formatierung),
-  `js/views/home.js`, `js/views/analysis/` (Pianoroll, Befundliste, Tooltips, Bedienung, KI-Check), `css/`
+  `js/views/home.js`, `js/views/analysis/` (Pianoroll, Befundliste, Tooltips, Bedienung, KI-Check),
+  `js/views/report/` (Musiker-Bericht), `css/`, `vendor/alphatab/` (alphaTab 1.8.4, MPL-2.0)
 
 ## Tests
 

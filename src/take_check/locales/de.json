@@ -211,7 +211,55 @@
     "aiBadge": "KI-Check",
     "aiBadgeTitle": "KI-Check vorhanden ({langs})",
     "aiBadgeStale": "KI-Check veraltet – die Analyse wurde danach neu berechnet ({langs})",
-    "aiBadgeRunning": "KI-Check läuft"
+    "aiBadgeRunning": "KI-Check läuft",
+    "report": {
+      "button": {
+        "one": "Bericht ({n} Befund)",
+        "other": "Bericht ({n} Befunde)"
+      },
+      "buttonTitle": "Bericht für den Musiker mit Notenausschnitten der ausgewählten Stellen",
+      "pick": "In den Bericht übernehmen",
+      "title": "Feedback zur Aufnahme",
+      "back": "Zurück zur Analyse",
+      "pdf": "PDF herunterladen",
+      "pdfBusy": "PDF wird erstellt …",
+      "print": "Drucken",
+      "printTitle": "Über den Druckdialog des Browsers drucken oder als PDF speichern",
+      "selectionHint": "Welche Stellen im Bericht stehen, legst du in der Analyse über die Kästchen fest. Hier kannst du Befunde kommentieren oder mit ✕ entfernen.",
+      "prefillAi": "Vorauswahl: Stellen aus „Zuerst anhören“ des KI-Checks.",
+      "prefillConfident": "Vorauswahl: alle sicheren Befunde.",
+      "feedback": "Feedback",
+      "feedbackPlaceholder": "Kurzes Feedback an den Musiker (optional) …",
+      "spots": "Stellen zum Nachbessern",
+      "none": "Keine Befunde ausgewählt.",
+      "bars": {
+        "one": "Takt {from}",
+        "other": "Takte {from}–{to}"
+      },
+      "pass": "{n}. Durchgang",
+      "take": "Aufnahme",
+      "score": "Vorlage",
+      "date": "Datum",
+      "legend": "Farbig markierte Noten und nummerierte Marken zeigen die Stellen; die Nummern beziehen sich auf die Liste darunter.",
+      "footer": "Erstellt mit Take Check · Notensatz: alphaTab",
+      "noScore": "Notenausschnitt nicht verfügbar – Darstellung als Pianoroll.",
+      "rollLegend": "Umriss: Vorlage · gefüllt: gespielt",
+      "pickAll": "Alle sichtbaren Befunde in den Bericht übernehmen / Auswahl leeren",
+      "hiddenPicks": {
+        "one": "{n} ausgewählter Befund ist ausgeblendet",
+        "other": "{n} ausgewählte Befunde sind ausgeblendet"
+      },
+      "unpickHidden": "abwählen",
+      "clef": "Notenschlüssel",
+      "clefs": {
+        "auto": "Automatisch",
+        "treble8": "Violinschlüssel 8va bassa",
+        "bass": "Bassschlüssel",
+        "score": "Wie in der Vorlage"
+      },
+      "commentPlaceholder": "Kommentar zu diesem Befund (optional) …",
+      "remove": "Aus dem Bericht entfernen"
+    }
   },
   "msg": {
     "alignment_uncertain": "Ausrichtung unsicher: nur {percent} der Noten passen. Bitte Versatz prüfen oder manuell einstellen.",
@@ -299,6 +347,9 @@
     "cli_ai_listen": "Zuerst anhören",
     "cli_ai_artifacts": "Vermutlich Artefakte",
     "cli_ai_patterns": "Muster",
-    "cli_ai_feedback": "Rückmeldung an den Musiker"
+    "cli_ai_feedback": "Rückmeldung an den Musiker",
+    "err_pdf_unavailable": "PDF-Export nicht eingerichtet: uv sync --extra pdf && uv run playwright install chromium – oder „Drucken“ verwenden",
+    "err_pdf_render": "PDF konnte nicht erstellt werden: {error}",
+    "bend_missing_open": "Bend auf leerer Saite fehlt: {note} sollte um {amount} gezogen werden – geht nur per Tremolo/Whammy; im DI ist kein Tonhöhenverlauf zu sehen (Whammy-Pedal oder Plugin nach dem DI?)"
   }
 }

@@ -1,6 +1,6 @@
 [project]
 name = "take-check"
-version = "1.1.2"
+version = "1.2.0"
 description = "Instrumentaufnahme gegen Vorlage prüfen – Gitarren-Takes (DI) mit Guitar-Pro-/MusicXML-Vorlagen vergleichen"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -16,6 +16,10 @@ dependencies = [
     "soundfile>=0.14.0",
     "uvicorn>=0.54.0",
 ]
+
+[project.optional-dependencies]
+# PDF-Export des Musiker-Berichts (danach einmalig: uv run playwright install chromium)
+pdf = ["playwright>=1.64.1"]
 
 [project.scripts]
 take-check = "take_check.cli:main"

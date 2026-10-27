@@ -1,6 +1,7 @@
 // Zu einem Befund springen: Ansicht ausrichten, Wiedergabe mit Vorlauf starten, Eintrag markieren.
 
 import { qs } from "../../core/dom.js";
+import { localIssueFor } from "../report/selection.js";
 
 /** Startzeit der Wiedergabe vor einem Befund (Sekunden oder ganze Takte Vorlauf). */
 export function prerollStart(view, time) {
@@ -33,13 +34,12 @@ export function selectIssue(view, issueId, play) {
   view.draw();
 }
 
-/** Befund aus Serverdaten anspringen: Timing-Befunde rechnet die Oberfläche selbst neu (eigene IDs) – dann über die Note. */
+/** Befund aus Serverdaten anspringen (z. B. Verweise des KI-Checks); ohne lokalen Befund nur die Stelle. */
 export function jumpToServerIssue(view, issueId) {
-  if (view.issues.some((i) => String(i.id) === String(issueId))) return selectIssue(view, issueId, true);
+  const local = localIssueFor(view, issueId);
+  if (local) return selectIssue(view, local.id, true);
   const srv = view.result.issues.find((i) => i.id === issueId);
   if (!srv) return;
-  const local = srv.note_id != null && view.issues.find((i) => i.note_id === srv.note_id);
-  if (local) return selectIssue(view, local.id, true);
   const { el, state } = view;
   el.audio.currentTime = prerollStart(view, srv.time);
   el.scroll.scrollLeft = Math.max(srv.time * state.pps - el.roll.clientWidth * 0.4, 0);

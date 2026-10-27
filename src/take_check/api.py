@@ -13,8 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Lock
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -281,6 +281,68 @@ def get_peaks(analysis_id: str):
     if not path.exists():
         raise _error(404, "err_no_peaks")
     return FileResponse(path, media_type="application/json")
+
+
+@app.get("/api/analyses/{analysis_id}/score")
+def get_score(analysis_id: str):
+    d = _dir(analysis_id)
+    return FileResponse(d / _read_meta(d)["score_file"], media_type="application/octet-stream")
+
+
+class ReportState(BaseModel):
+    issue_ids: list[str] | None = None
+    feedback: str | None = None
+    timing_tol_ms: float | None = None
+    source: str | None = None   # Herkunft der Auswahl: user, ai, confident
+    auto: bool | None = None    # automatisch vorbelegt, noch nicht von Hand geändert
+    clef: str | None = None     # Notenschlüssel im Bericht: auto, treble8, bass, score
+    comments: dict[str, str] | None = None  # Anmerkungen je Befund-ID (stehen im Bericht unter dem Befund)
+
+
+@app.get("/api/analyses/{analysis_id}/report")
+def get_report(analysis_id: str) -> dict:
+    """Auswahl und Feedbacktext des Musiker-Berichts; leer, solange nichts gespeichert wurde."""
+    d = _dir(analysis_id)
+    path = d / "report.json"
+    if not path.exists():
+        return {}
+    report = json.loads(path.read_text())
+    # Analyse neu berechnet → Befund-IDs passen nicht mehr; der Feedbacktext bleibt
+    if report.get("finished") != _read_meta(d).get("finished"):
+        report.pop("issue_ids", None)
+    return report
+
+
+@app.put("/api/analyses/{analysis_id}/report")
+def put_report(analysis_id: str, body: ReportState) -> dict:
+    d = _dir(analysis_id)
+    path = d / "report.json"
+    report = get_report(analysis_id)
+    report.update(body.model_dump(exclude_unset=True))
+    report["finished"] = _read_meta(d).get("finished")
+    tmp = d / "report.json.tmp"
+    tmp.write_text(json.dumps(report, ensure_ascii=False))
+    tmp.replace(path)
+    return report
+
+
+@app.get("/api/analyses/{analysis_id}/report.pdf")
+def get_report_pdf(analysis_id: str, request: Request, lang: str = "de") -> Response:
+    from .report_pdf import PdfError, render_pdf
+    d = _dir(analysis_id)
+    meta = _read_meta(d)
+    if meta.get("status") != "done":
+        raise _error(409, "err_not_ready")
+    lang = resolve_lang(lang)
+    port = request.scope["server"][1]  # die eigene Oberfläche, egal über welchen Host der Browser kommt
+    try:
+        pdf = render_pdf(f"http://127.0.0.1:{port}/#/a/{analysis_id}/report/print", lang)
+    except PdfError as exc:
+        raise HTTPException(503, to_json(exc.message))
+    name = f"{meta.get('title') or 'take'} - {Path(meta['audio_name']).stem}"
+    name = re.sub(r"[^\w.-]+", "_", name, flags=re.ASCII).strip("_")
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{name}.pdf"'})
 
 
 @app.get("/api/analyses/{analysis_id}/audio")

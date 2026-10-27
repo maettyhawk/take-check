@@ -199,7 +199,9 @@ def parse_gp(path: str | Path, tuning: list[int] | None = None) -> Score:
         measures.append(m)
 
     title = root.findtext("Score/Title") or path.stem
-    return build_score(measures, tuning, capo, title.strip() or path.stem, warnings)
+    score = build_score(measures, tuning, capo, title.strip() or path.stem, warnings)
+    score.track_index = track_idx
+    return score
 
 
 def _note(n: ET.Element, offset_q: float, dur_q: float, voice: str, grace: bool, tuning: list[int], capo: int,

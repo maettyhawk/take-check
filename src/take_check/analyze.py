@@ -169,6 +169,7 @@ def analyze(score_path: str | Path, audio_path: str | Path, opts: Options | None
     progress("result", 0.95)
     result = build_result(score, trans, results, issues, offset, tuning_cents, len(y) / SR, warnings, opts)
     result["profile"] = {"id": profile.id, "name": profile.name}
+    result["score_track"] = score.track_index
     result["version"] = RESULT_VERSION
     result["display"] = {"strum_direction": profile.strum.show_direction}
     result["meta"] = {"analysis_seconds": round(time.time() - t_start, 1), "pitch_range": [lo, hi]}

@@ -58,7 +58,12 @@ canvas { display: block; }
 .issues-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--border); gap: 8px; }
 .issues-list { overflow-y: auto; flex: 1; }
 #issue-count .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.issue { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; display: grid; grid-template-columns: 4px 1fr; gap: 10px; }
+.issue { padding: 8px 12px; border-bottom: 1px solid var(--border); cursor: pointer; display: grid; grid-template-columns: 4px 1fr auto; gap: 10px; }
+.pick { margin: 2px 0 0; cursor: pointer; accent-color: var(--accent); }
+#pick-all-slot { display: inline-flex; align-items: center; }
+#pick-all-slot .pick { margin: 0 0 0 4px; }
+.issues-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+a.btn { text-decoration: none; display: inline-block; color: var(--text); }
 .issue:hover { background: var(--row-alt); }
 .issue.sel { background: var(--row-alt); outline: 2px solid var(--accent); outline-offset: -2px; }
 .issue .bar { border-radius: 2px; }

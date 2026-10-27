@@ -1,0 +1,76 @@
+/* Musiker-Bericht: Vorschau als Papierblatt (immer hell, wie gedruckt), Druck- und PDF-Layout */
+
+@page { size: A4; margin: 14mm 14mm 16mm; }
+
+.report-tools { max-width: 210mm; margin: 0 auto 14px; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.report-clef { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 13px; }
+.report-tools .small { font-size: 12px; margin: 8px 0 0; }
+
+.sheet {
+  max-width: 210mm; margin: 0 auto; padding: 14mm; background: #fff; color: #1c2330;
+  border: 1px solid var(--border); border-radius: 4px; box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.sheet .muted { color: #5f6b7d; }
+.sheet h1 { font-size: 20px; margin: 0 0 6px; }
+.sheet h2 { font-size: 15px; margin: 22px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #dde2ea; }
+.sheet h3 { font-size: 13px; margin: 0 0 6px; }
+.sheet-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; color: #5f6b7d; font-size: 12px; }
+.sheet-feedback textarea {
+  width: 100%; min-height: 90px; resize: vertical; padding: 8px 10px; font: inherit; line-height: 1.5;
+  color: #1c2330; background: #fbfcfd; border: 1px solid #dde2ea; border-radius: 6px;
+}
+.feedback-text { white-space: pre-wrap; line-height: 1.5; }
+.print-only { display: none; }
+.sheet-legend { color: #5f6b7d; font-size: 12px; margin: 4px 0 12px; }
+.excerpt { break-inside: avoid; padding: 10px 0 12px; border-bottom: 1px solid #eef1f6; }
+.excerpt-score { width: 100%; overflow: hidden; }
+.excerpt-score .small { font-size: 11px; margin: 4px 0 0; }
+.excerpt-items { list-style: none; margin: 6px 0 0; padding: 0; }
+.excerpt-items li { display: grid; grid-template-columns: 32px 1fr auto; gap: 4px; margin: 5px 0; align-items: start; }
+.excerpt-items .num { justify-self: start; }
+.excerpt-items .num {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 10px; color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.excerpt-items .detail { color: #5f6b7d; font-size: 11.5px; }
+.excerpt-items .detail b { color: #1c2330; }
+.item-comment {
+  display: block; width: 100%; margin-top: 4px; padding: 3px 8px; resize: none; overflow: hidden;
+  font: inherit; font-size: 12px; line-height: 1.45; color: #1c2330; background: #fbfcfd;
+  border: 1px dashed #c9d0db; border-radius: 6px;
+}
+.item-comment:focus { border-style: solid; border-color: #2f6fdf; outline: none; background: #fff; }
+.item-comment:placeholder-shown { background: transparent; }
+.item-comment-text { margin-top: 3px; padding-left: 8px; border-left: 2px solid #2f6fdf; font-size: 12px; white-space: pre-wrap; }
+.item-remove {
+  width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: none;
+  color: #8a94a3; cursor: pointer; font-size: 12px; line-height: 1;
+}
+.item-remove:hover { color: #d7263d; border-color: #f0c4ca; background: #fdf2f3; }
+.sheet-foot { margin-top: 18px; color: #8a94a3; font-size: 10.5px; }
+
+/* Serverseitiges PDF (…/report/print) und Browser-Druck */
+body.print-mode .top { display: none; }
+body.print-mode main { padding: 0; }
+@media print {
+  body { background: #fff; }
+  .top, .report-tools, .sheet-feedback textarea, .item-comment { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .sheet { max-width: none; padding: 0; border: 0; box-shadow: none; border-radius: 0; }
+  .print-only { display: block; }
+  .item-remove { display: none; }
+  .print-only:empty, .sheet-feedback:has(.print-only:empty) { display: none; }
+}
+
+/* Bubbles über dem Notenbild: Nummern über dem System, zusätzliche Töne unter der Tabulatur */
+.score-marks, .score-extras { position: absolute; display: flex; gap: 2px; transform: translateX(-50%); z-index: 2; pointer-events: none; }
+.score-marks { transform: translate(-50%, calc(-100% - 3px)); }
+.score-mark, .score-extra { -webkit-print-color-adjust: exact; print-color-adjust: exact; white-space: nowrap; font-family: system-ui, sans-serif; }
+.score-mark {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 9px; color: #fff; font-size: 11px; font-weight: 700; box-shadow: 0 0 0 2px #fff;
+}
+.score-extra { padding: 0 5px; border: 1.5px solid; border-radius: 9px; background: #fff; font-size: 10.5px; font-weight: 700; line-height: 15px; }

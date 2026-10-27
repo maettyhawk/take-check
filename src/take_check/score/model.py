@@ -54,7 +54,8 @@ class Score:
     bars: list[Bar]
     tuning: list[int] | None = None   # MIDI-Tonhöhen der leeren Saiten, tiefste zuerst
     title: str = ""
-    warnings: list[str] = field(default_factory=list)
+    warnings: list = field(default_factory=list)
+    track_index: int = 0          # analysierte Spur in der Vorlagendatei (für die Notendarstellung im Bericht)
 
     def bar_at(self, t: float) -> tuple[int, int, float]:
         """(Taktnummer, Durchgang, Zählzeit) für eine Vorlagenzeit."""

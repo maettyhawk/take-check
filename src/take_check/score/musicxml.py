@@ -516,7 +516,9 @@ def parse_musicxml(path: str | Path, tuning: list[int] | None = None) -> Score:
     if tuning is None:
         warnings.append(msg("score_no_tuning"))
     title = root.findtext("work/work-title") or root.findtext("movement-title") or path.stem
-    return build_score(measures, tuning, capo, title, warnings)
+    score = build_score(measures, tuning, capo, title, warnings)
+    score.track_index = root.findall("part").index(part)
+    return score
 
 
 def build_score(measures: list[_Measure], tuning: list[int] | None, capo: int, title: str,

@@ -12,6 +12,7 @@ import { buildModel, computeIssues, isVisible } from "./model.js";
 import { selectIssue } from "./navigation.js";
 import { createPianoroll } from "./pianoroll.js";
 import { analysisTemplate } from "./template.js";
+import { flushSelection, loadSelection, saveSelection } from "../report/selection.js";
 import { attachTooltip } from "./tooltip.js";
 
 function initialState(result) {
@@ -42,6 +43,7 @@ function renderAnalysis(app, { id, meta, result, peaks, reload }) {
     model: buildModel(result, peaks),
     state: initialState(result),
     issues: [],
+    report: null,
     visibleIssues() { return this.issues.filter((i) => isVisible(this.state, i)); },
     refresh() { this.issues = computeIssues(this); renderStats(this); renderIssues(this); this.draw(); },
     renderIssues() { renderIssues(this); },
@@ -66,7 +68,18 @@ function renderAnalysis(app, { id, meta, result, peaks, reload }) {
   if (meta.outdated) showOutdatedNotice(view);
   view.pianoroll.size();
   view.refresh();
-  return () => disposers.forEach((dispose) => dispose());
+  let disposed = false;
+  // Berichtsauswahl nachladen (Kästchen in der Befundliste)
+  loadSelection(view, view.visibleIssues()).then((selection) => {
+    if (disposed) return;
+    view.report = selection;
+    // Vorbelegung gleich speichern, damit Vorschau und PDF genau diese Auswahl zeigen
+    if (selection.auto) {
+      saveSelection(view, { issue_ids: [...selection.ids], source: selection.source, auto: true, timing_tol_ms: view.state.timingTol });
+    }
+    view.renderIssues();
+  }).catch(() => {});
+  return () => { disposed = true; disposers.forEach((dispose) => dispose()); flushSelection(id); };
 }
 
 function showOutdatedNotice(view) {

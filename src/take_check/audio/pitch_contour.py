@@ -11,6 +11,7 @@ from ..i18n import msg
 BPO = 60
 HARMONIC_BINS = (0, 60, 95)  # 1., 2., 3. Teilton
 HARMONIC_WEIGHTS = (1.0, 0.5, 0.33)
+OPEN_STRING_CONF = 0.3  # Bends auf leeren Saiten: nur per Tremolo/Whammy möglich → nur als Hinweis
 
 
 def _hz(midi: float) -> float:
@@ -91,6 +92,9 @@ def evaluate_bends(tracker: PitchTracker, results: list[NoteResult], issues: Iss
         t, p = tracker.note_contour(onset + 0.015, onset + n.duration, n.pitch - 0.8, n.pitch + n.bend_max + 1.0)
         if len(t) < 4:
             continue
+        # leere Saite: mit dem Finger nicht zu ziehen, also Tremolo/Whammy – Befunde nur als Hinweis
+        open_string = n.fret == 0
+        conf = (lambda c: min(c, OPEN_STRING_CONF)) if open_string else (lambda c: c)
         rel = p - n.pitch - tune
         r.contour = [[round(float(a), 3), round(float(b), 2)] for a, b in zip(t[::2], rel[::2])]
         bt = np.array([x for x, _ in n.bend])
@@ -108,14 +112,14 @@ def evaluate_bends(tracker: PitchTracker, results: list[NoteResult], issues: Iss
         amount = msg("semitones", n=f"{target:g}")
         if reached < 0.35 * target:
             issues.add("bend_missing", onset,
-                       msg("bend_missing", note=note_name(n.pitch), amount=amount),
-                       0.75, n, r.det, cents=round(dev))
+                       msg("bend_missing_open" if open_string else "bend_missing", note=note_name(n.pitch), amount=amount),
+                       conf(0.75), n, r.det, cents=round(dev))
             continue
         if abs(dev) > tol_cents:
             issues.add("bend_pitch", onset,
                        msg("bend_too_flat" if dev < 0 else "bend_too_sharp", cents=f"{dev:+.0f}",
                            note=note_name(n.pitch), amount=amount),
-                       0.5 + min(abs(dev) / 100, 0.4), n, r.det, cents=round(dev))
+                       conf(0.5 + min(abs(dev) / 100, 0.4)), n, r.det, cents=round(dev))
         if n.bend_timed:
             expected_peak = float(bt[np.argmax(bs >= 0.9 * target)])
             hit = (t - onset >= 0) & (rel >= 0.9 * reached)
@@ -124,19 +128,19 @@ def evaluate_bends(tracker: PitchTracker, results: list[NoteResult], issues: Iss
                 if lateness > max(0.25, 0.2 * n.duration):
                     issues.add("bend_late", onset,
                                msg("bend_late", ms=f"{lateness * 1000:.0f}", note=note_name(n.pitch)),
-                               0.35, n, r.det, delta_ms=round(lateness * 1000))
+                               conf(0.35), n, r.det, delta_ms=round(lateness * 1000))
         if bs[0] >= 0.5:
             start = rel[t - onset <= 0.05]
             if len(start) and float(np.median(start)) < 0.5 * bs[0]:
                 issues.add("prebend_missing", onset,
                            msg("prebend_missing", note=note_name(n.pitch)),
-                           0.55, n, r.det)
+                           conf(0.55), n, r.det)
         if bs[-1] <= 0.1 * target and bs.max() > bs[-1]:
             tail = rel[t >= t[0] + 0.85 * (t[-1] - t[0])]
             if len(tail) and float(np.median(tail)) > 0.4:
                 issues.add("release_missing", onset,
                            msg("release_incomplete", cents=f"{float(np.median(tail)) * 100:.0f}"),
-                           0.55, n, r.det, cents=round(float(np.median(tail)) * 100))
+                           conf(0.55), n, r.det, cents=round(float(np.median(tail)) * 100))
 
 
 def evaluate_unwanted(tracker: PitchTracker, results: list[NoteResult], issues: Issues, tuning_cents: float) -> None:

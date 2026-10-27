@@ -211,7 +211,55 @@
     "aiBadge": "AI check",
     "aiBadgeTitle": "AI check available ({langs})",
     "aiBadgeStale": "AI check outdated – the analysis was recomputed afterwards ({langs})",
-    "aiBadgeRunning": "AI check running"
+    "aiBadgeRunning": "AI check running",
+    "report": {
+      "button": {
+        "one": "Report ({n} finding)",
+        "other": "Report ({n} findings)"
+      },
+      "buttonTitle": "Report for the musician with score excerpts of the selected spots",
+      "pick": "Include in report",
+      "title": "Feedback on your take",
+      "back": "Back to analysis",
+      "pdf": "Download PDF",
+      "pdfBusy": "Creating PDF …",
+      "print": "Print",
+      "printTitle": "Print via the browser's print dialog or save as PDF",
+      "selectionHint": "Choose which spots appear in the report with the checkboxes in the analysis. Here you can comment on findings or remove them with ✕.",
+      "prefillAi": "Preselection: spots from the AI check's “Listen first”.",
+      "prefillConfident": "Preselection: all confident findings.",
+      "feedback": "Feedback",
+      "feedbackPlaceholder": "Short feedback for the musician (optional) …",
+      "spots": "Spots to fix",
+      "none": "No findings selected.",
+      "bars": {
+        "one": "Bar {from}",
+        "other": "Bars {from}–{to}"
+      },
+      "pass": "pass {n}",
+      "take": "Take",
+      "score": "Score",
+      "date": "Date",
+      "legend": "Coloured notes and numbered markers show the spots; the numbers refer to the list below.",
+      "footer": "Created with Take Check · Engraving: alphaTab",
+      "noScore": "Score excerpt not available – shown as piano roll.",
+      "rollLegend": "Outline: score · filled: played",
+      "pickAll": "Include all visible findings in the report / clear selection",
+      "hiddenPicks": {
+        "one": "{n} selected finding is hidden",
+        "other": "{n} selected findings are hidden"
+      },
+      "unpickHidden": "deselect",
+      "clef": "Clef",
+      "clefs": {
+        "auto": "Automatic",
+        "treble8": "Treble clef 8vb",
+        "bass": "Bass clef",
+        "score": "As in score"
+      },
+      "commentPlaceholder": "Comment on this finding (optional) …",
+      "remove": "Remove from report"
+    }
   },
   "msg": {
     "alignment_uncertain": "Alignment uncertain: only {percent} of the notes match. Please check the offset or set it manually.",
@@ -302,6 +350,9 @@
     "cli_ai_listen": "Listen first",
     "cli_ai_artifacts": "Likely artifacts",
     "cli_ai_patterns": "Patterns",
-    "cli_ai_feedback": "Feedback for the musician"
+    "cli_ai_feedback": "Feedback for the musician",
+    "err_pdf_unavailable": "PDF export not set up: uv sync --extra pdf && uv run playwright install chromium – or use “Print”",
+    "err_pdf_render": "Could not create the PDF: {error}",
+    "bend_missing_open": "Bend on open string missing: {note} should be bent by {amount} – only possible with tremolo/whammy; the DI shows no pitch change (whammy pedal or plugin after the DI?)"
   }
 }

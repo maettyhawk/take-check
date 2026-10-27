@@ -62,7 +62,10 @@ export function analysisTemplate(view) {
         </div>
       </div>
       <aside class="issues">
-        <div class="issues-head"><div id="issue-count"></div><button class="btn small" id="copy" title="${t("copyTitle")}">${t("copy")}</button></div>
+        <div class="issues-head"><div id="issue-count"></div><div class="issues-actions">
+          <button class="btn small" id="copy" title="${t("copyTitle")}">${t("copy")}</button>
+          <a class="btn small" id="report-btn" href="#/a/${id}/report" title="${t("report.buttonTitle")}"></a>
+          <span id="pick-all-slot"></span></div></div>
         <div class="issues-list" id="issues"></div>
       </aside>
     </div>

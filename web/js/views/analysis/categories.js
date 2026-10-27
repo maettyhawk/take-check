@@ -7,6 +7,11 @@ export const CATEGORY_COLORS = {
   bend: "--c-bend", harm: "--c-harm", stops: "--c-stops",
 };
 
+// Feste Farben fürs Papier (Bericht/PDF) – die hellen Werte aus theme.css, unabhängig vom gewählten Theme
+export const PRINT_COLORS = {
+  notes: "#d7263d", timing: "#d98a00", pm: "#7b4fd6", legato: "#c2409a", bend: "#1f7fd1", harm: "#0f9488", stops: "#8a6d1f",
+};
+
 const TYPE_CATEGORY = {
   missing: "notes", wrong_pitch: "notes", extra: "notes", chord_tone_omitted: "notes",
   early: "timing", late: "timing", short: "timing", slow_strum: "timing",
@@ -18,4 +23,5 @@ const TYPE_CATEGORY = {
 
 export const catOf = (type) => TYPE_CATEGORY[type] || "notes";
 export const colorOf = (type) => CATEGORY_COLORS[catOf(type)];
+export const printColorOf = (type) => PRINT_COLORS[catOf(type)];
 export const labelOf = (type) => t(`types.${type}`, {}, type);
