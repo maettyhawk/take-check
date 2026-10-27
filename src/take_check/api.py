@@ -64,8 +64,19 @@ def _write_meta(d: Path, **changes) -> dict:
     return meta
 
 
+def _ensure_peaks(d: Path) -> Path:
+    """Wellenform-Daten anlegen bzw. veraltete (andere Version) neu berechnen."""
+    from .analyze import PEAKS_VERSION, load_audio, waveform_peaks
+
+    path = d / "peaks.json"
+    if path.exists() and json.loads(path.read_text()).get("version") == PEAKS_VERSION:
+        return path
+    path.write_text(json.dumps(waveform_peaks(load_audio(d / _read_meta(d)["audio_file"]))))
+    return path
+
+
 def _run(d: Path) -> None:
-    from .analyze import RESULT_VERSION, SR, analyze, load_audio, waveform_peaks
+    from .analyze import RESULT_VERSION, analyze
 
     meta = _read_meta(d)
     _write_meta(d, status="running", stage="start", progress=0.0, error=None)
@@ -78,10 +89,7 @@ def _run(d: Path) -> None:
                          offset=meta.get("offset_manual"),
                          cache_dir=d, progress=lambda stage, f: _write_meta(d, stage=stage, progress=round(f, 2)))
         (d / "result.json").write_text(json.dumps(result, ensure_ascii=False))
-        if not (d / "peaks.json").exists():
-            y = load_audio(d / meta["audio_file"])
-            (d / "peaks.json").write_text(json.dumps({"per_second": 100, "duration": len(y) / SR,
-                                                      "peaks": waveform_peaks(y)}))
+        _ensure_peaks(d)
         s = result["summary"]
         _write_meta(d, status="done", stage="done", progress=1.0, title=result["title"], result_version=RESULT_VERSION,
                     offset=result["offset"], notes_checked=s["notes_checked"], notes_ok=s["notes_ok"],
@@ -277,10 +285,10 @@ def get_result(analysis_id: str):
 
 @app.get("/api/analyses/{analysis_id}/peaks")
 def get_peaks(analysis_id: str):
-    path = _dir(analysis_id) / "peaks.json"
-    if not path.exists():
+    d = _dir(analysis_id)
+    if not (d / "result.json").exists():
         raise _error(404, "err_no_peaks")
-    return FileResponse(path, media_type="application/json")
+    return FileResponse(_ensure_peaks(d), media_type="application/json")
 
 
 @app.get("/api/analyses/{analysis_id}/score")

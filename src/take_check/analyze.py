@@ -48,11 +48,20 @@ def load_audio(path: str | Path) -> np.ndarray:
     return y
 
 
-def waveform_peaks(y: np.ndarray, per_second: int = 100) -> list[list[float]]:
-    hop = SR // per_second
-    n = len(y) // hop
-    frames = y[:n * hop].reshape(n, hop)
-    return np.round(np.stack([frames.min(axis=1), frames.max(axis=1)], axis=1), 3).tolist()
+PEAKS_VERSION = 2  # 1: Blockgröße SR // per_second abgerundet → Wellenform lief der Notation davon
+
+
+def waveform_peaks(y: np.ndarray, per_second: int = 100) -> dict:
+    """Min/Max je Block für die Wellenform. Blockgrenzen exakt bei k / per_second Sekunden – eine
+    abgerundete Blockgröße (22050 // 100 = 220) ergäbe 100,23 Blöcke/s und eine wachsende Verschiebung."""
+    n = int(len(y) * per_second // SR)
+    starts = np.round(np.arange(n) * SR / per_second).astype(int)
+    peaks = np.stack([np.minimum.reduceat(y, starts), np.maximum.reduceat(y, starts)], axis=1) if n else np.empty((0, 2))
+    if n:  # reduceat nimmt für den letzten Block alles bis zum Ende; auf eine Blocklänge begrenzen
+        last = y[starts[-1]:int(round(n * SR / per_second))]
+        peaks[-1] = [last.min(), last.max()]
+    return {"version": PEAKS_VERSION, "per_second": per_second, "duration": len(y) / SR,
+            "peaks": np.round(peaks, 3).tolist()}
 
 
 def pitch_range(score: Score) -> tuple[int, int]:
